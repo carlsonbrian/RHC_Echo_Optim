@@ -519,8 +519,8 @@
             fmc_Opts.Algorithm = 'active-set';          % Set algorithm type
             fmc_Opts.Display = 'iter';                  % Set display content
             fmc_Opts.TolFun = 1e-10;                    % Set tolerance on function
-            fmc_Opts.MaxFunEvals = 5000; %5000;         % Set max num of fun evals
-            fmc_Opts.MaxIter = 100;                     % Set max num of iterations
+            fmc_Opts.MaxFunEvals = 50; %5000;           % Set max num of fun evals
+            fmc_Opts.MaxIter = 10; %100;                % Set max num of iterations
             if (Parallel_Flag == 1)
                 fmc_Opts.UseParallel = 1;
             end
@@ -536,9 +536,9 @@
             
             % Genetic Algorithm Opimization - Serial computation
             ga_Opts = optimoptions('ga', ...
-                'PopulationSize',250, ...            % 250
+                'PopulationSize',25, ...            % 250
                 'Display','iter', ...
-                'MaxStallGenerations',10);           % 10
+                'MaxStallGenerations',2);           % 10
             Num_AdjParams = size(p,2);
             % Set objective function handle and 
             %  identify adjustable parameter vector, p
@@ -559,9 +559,9 @@
                 warning('off','all');
             end  
             ga_Opts = optimoptions('ga', ...
-                'PopulationSize',250, ...            % 250
+                'PopulationSize',25, ...            % 250
                 'Display','iter', ...
-                'MaxStallGenerations',10, ...        % 10
+                'MaxStallGenerations',2, ...        % 10
                 'UseParallel',true);
             Num_AdjParams = size(p,2);
             % Set objective function handle and 
@@ -660,46 +660,42 @@
         X0(11) = V_spt0;
         % Calculating timespans to reach steady state and then for simulation
         TSpan_SS = [0 NumBeats_SS * period];
-        TSpan_Sim = [0 NumBeats_Sim * period];
         % Build mass matrix for DAE solver
         M = eye(11);                                % Put identity on diagonal
         M(11,11) = 0;                               % Set last express as a ZFun
         % Set ODE/DAE options and time span
         ODE_Opts = odeset('Mass',M); 
         % Solve over the time span with ode15s
-        [T_Out_SmithSS,X_Out_SmithSS] = ode15s(@dXdT_Smith, ...
+        [T_Out_Smith,X_Out_Smith] = ode15s(@dXdT_Smith, ...
             TSpan_SS,X0,ODE_Opts,DriverP_Struct,CVParam_Struct);
-        % Now solve over the simulation time span
-        [T_Out_SmithSim,X_Out_SmithSim] = ode15s(@dXdT_Smith,TSpan_Sim, ...
-            X_Out_SmithSS(end,:),ODE_Opts,DriverP_Struct,CVParam_Struct);
         % Calculation intermediate pressures to plot
-        Num_TOut_SmithSim = size(T_Out_SmithSim,1); % Number of time points
-        P_LV_SmithSim = zeros(Num_TOut_SmithSim,1); % Preallocating matrices
-        P_RV_SmithSim = zeros(Num_TOut_SmithSim,1);
-        P_AO_SmithSim = zeros(Num_TOut_SmithSim,1);
-        P_VC_SmithSim = zeros(Num_TOut_SmithSim,1);
-        P_PA_SmithSim = zeros(Num_TOut_SmithSim,1);
-        P_PU_SmithSim = zeros(Num_TOut_SmithSim,1);
-        V_LVES_SmithSim = 1000;
-        V_LVED_SmithSim = 0;
+        Num_TOut_Smith = size(T_Out_Smith,1); % Number of time points
+        P_LV_Smith = zeros(Num_TOut_Smith,1); % Preallocating matrices
+        P_RV_Smith = zeros(Num_TOut_Smith,1);
+        P_AO_Smith = zeros(Num_TOut_Smith,1);
+        P_VC_Smith = zeros(Num_TOut_Smith,1);
+        P_PA_Smith = zeros(Num_TOut_Smith,1);
+        P_PU_Smith = zeros(Num_TOut_Smith,1);
+        V_LVES_Smith = 1000;
+        V_LVED_Smith = 0;
         % Running Smith model and loading intermediates for plotting
-        for i = 1:Num_TOut_SmithSim
-            VarOut = dXdT_Smith(T_Out_SmithSim(i), ...
-                X_Out_SmithSim(i,:),DriverP_Struct, ...
+        for i = 1:Num_TOut_Smith
+            VarOut = dXdT_Smith(T_Out_Smith(i), ...
+                X_Out_Smith(i,:),DriverP_Struct, ...
                 CVParam_Struct,1);
-            P_LV_SmithSim(i) = VarOut(1);
-            P_RV_SmithSim(i) = VarOut(2);
-            P_AO_SmithSim(i) = VarOut(3);
-            P_VC_SmithSim(i) = VarOut(4);
-            P_PA_SmithSim(i) = VarOut(5);
-            P_PU_SmithSim(i) = VarOut(6);
-            V_LVES_SmithSim = ...
-                min(V_LVES_SmithSim,X_Out_SmithSim(i,1));
-            V_LVED_SmithSim = ...
-                max(V_LVED_SmithSim,X_Out_SmithSim(i,1));
+            P_LV_Smith(i) = VarOut(1);
+            P_RV_Smith(i) = VarOut(2);
+            P_AO_Smith(i) = VarOut(3);
+            P_VC_Smith(i) = VarOut(4);
+            P_PA_Smith(i) = VarOut(5);
+            P_PU_Smith(i) = VarOut(6);
+            V_LVES_Smith = ...
+                min(V_LVES_Smith,X_Out_Smith(i,1));
+            V_LVED_Smith = ...
+                max(V_LVED_Smith,X_Out_Smith(i,1));
         end
-        CO_SmithSim = ((V_LVED_SmithSim - ...
-            V_LVES_SmithSim) * HR_Smith) / 1000;
+        CO_Smith = ((V_LVED_Smith - ...
+            V_LVES_Smith) * HR_Smith) / 1000;
             
     else                                            % Optim or handtune
         
@@ -805,7 +801,7 @@
                 V_LVED_RHC = ...
                     max(V_LVED_RHC,X_Out_RHC(i,1));
             end
-            CO_RHC = ((V_LVED_RHC - ...
+            CO_RHCSim = ((V_LVED_RHC - ...
                 V_LVES_RHC) * HR_RHC) / 1000;
                 
             % RUN ECHO SIMULATION NEXT
@@ -836,18 +832,25 @@
             [T_Out_Echo,X_Out_Echo] = ode15s(@dXdT_Smith, ...
                 TSpan_SS,X0,ODE_Opts,DriverP_Struct,CVParam_Struct);
             % CALCULATING CO OF ECHO SIMULATION
-            Num_TOut_Echo = ...                  % Number of time points
-                size(T_Out_Echo,1); 
+            Num_TOut_Echo = ...                         % Number of time points
+                size(T_Out_Echo,1);
+            P_LV_Echo = zeros(Num_TOut_Echo,1);           % Preallocating matrices
+            P_RV_Echo = zeros(Num_TOut_Echo,1);
             V_LVES_Echo = 1000;
             V_LVED_Echo = 0;
             % FINDING LV END DIASTOLIC AND END SYSTOLIC VOLUME
             for i = 1:Num_TOut_Echo
+                VarOut = dXdT_Smith(T_Out_Echo(i), ...
+                    X_Out_Echo(i,:),DriverP_Struct, ...
+                    CVParam_Struct,1);
+                P_LV_Echo(i) = VarOut(1);
+                P_RV_Echo(i) = VarOut(2);
                 V_LVES_Echo = ...
                     min(V_LVES_Echo,X_Out_Echo(i,1));
                 V_LVED_Echo = ...
                     max(V_LVED_Echo,X_Out_Echo(i,1));
             end
-            CO_Echo = ((V_LVED_Echo - ...
+            CO_EchoSim = ((V_LVED_Echo - ...
                 V_LVES_Echo) * HR_Echo) / 1000;
             
             % GETTING THE RESIDUAL AT THE OPTIM PARAMETER VALUES
@@ -913,7 +916,7 @@
                 V_LVED_RHC = ...
                     max(V_LVED_RHC,X_Out_RHC(i,1));
             end
-            CO_RHC = ((V_LVED_RHC - ...
+            CO_RHCSim = ((V_LVED_RHC - ...
                 V_LVES_RHC) * HR_RHC) / 1000;
             
             % GETTING THE RESIDUAL AT THE OPTIM PARAMETER VALUES
@@ -939,16 +942,20 @@
     
     if (SmithParam_Flag == 1)
         
-        T_Out = T_Out_SmithSim;
-        P_RVSim = P_RV_SmithSim;
-        P_AOSim = P_AO_SmithSim;
-        P_PASim = P_PA_SmithSim;
-        P_PUSim = P_PU_SmithSim;
-        CO_Sim = CO_SmithSim;
-        V_LVSim = X_Out_SmithSim(:,1);
-        V_RVSim = X_Out_SmithSim(:,2);
-        P_LVSim = P_LV_SmithSim;
-        P_VCSim = P_VC_SmithSim;
+        NumBeat_Start = NumBeats_SS - NumBeats_ResPlot;
+        tStart_Ind = ...
+            find(T_Out_Smith >= (NumBeat_Start * period),1,'first');
+        tStart = T_Out_Smith(tStart_Ind);
+        T_Out = T_Out_Smith(tStart_Ind:end) - tStart;
+        P_RVSim = P_RV_Smith(tStart_Ind:end);
+        P_AOSim = P_AO_Smith(tStart_Ind:end);
+        P_PASim = P_PA_Smith(tStart_Ind:end);
+        P_PUSim = P_PU_Smith(tStart_Ind:end);
+        CO_Sim = CO_Smith;
+        V_LVSim = X_Out_Smith(tStart_Ind:end,1);
+        V_RVSim = X_Out_Smith(tStart_Ind:end,2);
+        P_LVSim = P_LV_Smith(tStart_Ind:end);
+        P_VCSim = P_VC_Smith(tStart_Ind:end);
         
         SimPlot_Values = {T_Out P_RVSim P_AOSim P_PASim ...
             P_PUSim CO_Sim V_LVSim V_RVSim P_LVSim P_VCSim};
@@ -984,22 +991,34 @@
         
         if (RHCEcho_Flag == 1)
             
-            T_Out = T_Out_RHCSim;
-            P_RVSim = P_RV_RHCSim;
-            P_AOSim = P_AO_RHCSim;
-            P_PASim = P_PA_RHCSim;
-            P_PUSim = P_PU_RHCSim;
-            V_LVSim = X_Out_EchoSim(:,1);
-            V_RVSim = X_Out_EchoSim(:,2);
-            P_LVSim = P_LV_RHCSim;
-            P_VCSim = P_VC_RHCSim;
+            NumBeat_Start = NumBeats_SS - NumBeats_ResPlot;
+            tStartRHC_Ind = ...
+                find(T_Out_RHC >= (NumBeat_Start * period),1,'first');
+            tStartRHC = T_Out_RHC(tStartRHC_Ind);
+            tStartEcho_Ind = ...
+                find(T_Out_Echo >= (NumBeat_Start * period),1,'first');
+            tStartEcho = T_Out_Echo(tStartEcho_Ind);
+            T_OutRHC = T_Out_RHC(tStartRHC_Ind:end) - tStartRHC;
+            T_OutEcho = T_Out_Echo(tStartEcho_Ind:end) - tStartEcho;
+            P_RVRHCSim = P_RV_RHC(tStartRHC_Ind:end);
+            P_RVEchoSim = P_RV_Echo(tStartEcho_Ind:end);
+            P_AOSim = P_AO_RHC(tStartRHC_Ind:end);
+            P_PASim = P_PA_RHC(tStartRHC_Ind:end);
+            P_PUSim = P_PU_RHC(tStartRHC_Ind:end);
+            V_LVSim = X_Out_Echo(tStartEcho_Ind:end,1);
+            V_RVSim = X_Out_Echo(tStartEcho_Ind:end,2);
+            P_LVRHCSim = P_LV_RHC(tStartRHC_Ind:end);
+            P_LVEchoSim = P_LV_Echo(tStartEcho_Ind:end);
+            P_VCSim = P_VC_RHC(tStartRHC_Ind:end);
         
-            SimPlot_Values = {T_Out P_RVSim P_AOSim P_PASim ...
-                P_PUSim CO_RHCSim CO_EchoSim V_LVSim V_RVSim ...
-                P_LVSim P_VCSim};
-            SimPlot_Fields = {'T_Out' 'P_RVSim' 'P_AOSim' 'P_PASim' ...
-                'P_PUSim' 'CO_RHCSim' 'CO_EchoSim' 'V_LVSim' ...
-                'V_RVSim' 'P_LVSim' 'P_VCSim'};
+            SimPlot_Values = {T_OutRHC T_OutEcho P_RVRHCSim ...
+                P_RVEchoSim P_AOSim P_PASim P_PUSim CO_RHCSim ...
+                CO_EchoSim V_LVSim V_RVSim P_LVRHCSim ...
+                P_LVEchoSim P_VCSim};
+            SimPlot_Fields = {'T_OutRHC' 'T_OutEcho' 'P_RVRHCSim' ...
+                'P_RVEchoSim' 'P_AOSim' 'P_PASim' 'P_PUSim' ...
+                'CO_RHCSim' 'CO_EchoSim' 'V_LVSim' 'V_RVSim' ...
+                'P_LVRHCSim' 'P_LVEchoSim' 'P_VCSim'};
             SimPlot_Struct = cell2struct(SimPlot_Values, ...
                 SimPlot_Fields,2);
      
@@ -1007,15 +1026,18 @@
             
         else
             
-            T_Out = T_Out_RHCSim;
-            P_RVSim = P_RV_RHCSim;
-            P_AOSim = P_AO_RHCSim;
-            P_PASim = P_PA_RHCSim;
-            P_PUSim = P_PU_RHCSim;
-            V_LVSim = X_Out_RHCSim(:,1);
-            V_RVSim = X_Out_RHCSim(:,2);
-            P_LVSim = P_LV_RHCSim;
-            P_VCSim = P_VC_RHCSim;
+            NumBeat_Start = NumBeats_SS - NumBeats_ResPlot;
+            tStartRHC_Ind = ...
+                find(T_Out_RHC >= (NumBeat_Start * period),1,'first');
+            T_Out = T_Out_RHC(tStartRHC_Ind:end);
+            P_RVSim = P_RV_RHC(tStartRHC_Ind:end);
+            P_AOSim = P_AO_RHC(tStartRHC_Ind:end);
+            P_PASim = P_PA_RHC(tStartRHC_Ind:end);
+            P_PUSim = P_PU_RHC(tStartRHC_Ind:end);
+            V_LVSim = X_Out_RHC(tStartRHC_Ind:end,1);
+            V_RVSim = X_Out_RHC(tStartRHC_Ind:end,2);
+            P_LVSim = P_LV_RHC(tStartRHC_Ind:end);
+            P_VCSim = P_VC_RHC(tStartRHC_Ind:end);
         
             SimPlot_Values = {T_Out P_RVSim P_AOSim P_PASim ...
                 P_PUSim CO_RHCSim V_LVSim V_RVSim P_LVSim P_VCSim};

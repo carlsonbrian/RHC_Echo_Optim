@@ -24,9 +24,9 @@
 %  Optim Data for       S M I T H   C V   M O D E L   O B J   F U N C T I O N
 % ***********************************************************************************
 
-function Res = PatSpecHF_ObjFun_MinRuns(p,AllStruct_Struct)
+function Res = PatSpecHF_ObjFun(p,AllStruct_Struct)
 
-    warning('off','all')
+%     warning('off','all')
 
 %%  Unpack all the passed structures
     if (numel(fieldnames(AllStruct_Struct)) == 6)
@@ -198,62 +198,25 @@ function Res = PatSpecHF_ObjFun_MinRuns(p,AllStruct_Struct)
             % Set ODE/DAE options and time span
             ODE_Opts = odeset('Mass',M); 
             % Solve over the steady state time span with ode15s
-            [~,X_RHC_Out_SS] = ...
+            [T_RHC_Out,X_RHC_Out] = ...
                 ode15s(@dXdT_Smith,TSpan_SS,X0, ...
                 ODE_Opts,DriverP_Struct,CVParam_Struct);
-            % Now solve over the simulation time span
-            [T_RHC_Out,X_RHC_Out] = ...
-                ode15s(@dXdT_Smith,TSpan_Sim,X_RHC_Out_SS(end,:), ...
-                ODE_Opts,DriverP_Struct,CVParam_Struct);
+           
             %  Now run Smith et al. model to get intermediate pressures
-            Num_TOut_RHCSim = size(T_RHC_Out,1);    % Number of time points
-            P_RV_RHCSim = zeros(Num_TOut_RHCSim,1); % Preallocate matrices
-            P_AO_RHCSim = zeros(Num_TOut_RHCSim,1);
-            P_PA_RHCSim = zeros(Num_TOut_RHCSim,1);
-            P_PU_RHCSim = zeros(Num_TOut_RHCSim,1);
+            Num_TOut_RHC = size(T_RHC_Out,1);    % Number of time points
+            P_RV_RHC = zeros(Num_TOut_RHC,1); % Preallocate matrices
+            P_AO_RHC = zeros(Num_TOut_RHC,1);
+            P_PA_RHC = zeros(Num_TOut_RHC,1);
+            P_PU_RHC = zeros(Num_TOut_RHC,1);
             % Use output state variable vector to get pressures
-            for i = 1:Num_TOut_RHCSim
+            for i = 1:Num_TOut_RHC
                 VarOut = dXdT_Smith(T_RHC_Out(i), ...
                     X_RHC_Out(i,:),DriverP_Struct,CVParam_Struct,1);
-                P_RV_RHCSim(i) = VarOut(2);
-                P_AO_RHCSim(i) = VarOut(3);
-                P_PA_RHCSim(i) = VarOut(5);
-                P_PU_RHCSim(i) = VarOut(6);
+                P_RV_RHC(i) = VarOut(2);
+                P_AO_RHC(i) = VarOut(3);
+                P_PA_RHC(i) = VarOut(5);
+                P_PU_RHC(i) = VarOut(6);
             end
-            
-            % GET SIMULATION VALUES TO COMPARE TO RHC DATA
-            % Assigning initial low vlaues on systolic and 
-            %  high values on diastolic pressures
-            P_RVsyst_RHCSim = 0;
-            P_RVdiast_RHCSim = 200;
-            P_PAsyst_RHCSim = 0;
-            P_PAdiast_RHCSim = 150;
-            P_AOsyst_RHCSim = 0;
-            P_AOdiast_RHCSim = 250;
-            V_LVsyst_RHCSim = 150;
-            V_LVdiast_RHCSim = 0;
-            P_PCWave_RHCSum = 0;
-            % Specifying the number of beats at the end of the RHC simulation
-            %  that we want to calculate the residual from and then finding 
-            %  the portion of the simulation to extract values from
-            TimeStart_RHCResCalc = ...
-                (NumBeats_Sim - NumBeats_PlotRes) * period;
-            tIndStart_RHCResCalc = ...
-                find((T_RHC_Out >= TimeStart_RHCResCalc),1,'first');
-            % Looking for systolic and diastolic values in simulation results
-            for i = tIndStart_RHCResCalc:Num_TOut_RHCSim
-                P_RVsyst_RHCSim = max(P_RVsyst_RHCSim,P_RV_RHCSim(i));
-                P_RVdiast_RHCSim = min(P_RVdiast_RHCSim,P_RV_RHCSim(i));
-                P_PAsyst_RHCSim = max(P_PAsyst_RHCSim,P_PA_RHCSim(i));
-                P_PAdiast_RHCSim = min(P_PAdiast_RHCSim,P_PA_RHCSim(i));
-                P_AOsyst_RHCSim = max(P_AOsyst_RHCSim,P_AO_RHCSim(i));
-                P_AOdiast_RHCSim = min(P_AOdiast_RHCSim,P_AO_RHCSim(i));
-                P_PCWave_RHCSum = P_PCWave_RHCSum + P_PU_RHCSim(i);
-                V_LVsyst_RHCSim = min(V_LVsyst_RHCSim,X_RHC_Out(i,1));
-                V_LVdiast_RHCSim = max(V_LVdiast_RHCSim,X_RHC_Out(i,1));
-            end
-            P_PCWave_RHCSim = P_PCWave_RHCSum / Num_TOut_RHCSim;
-            CO_RHCSim = ((V_LVdiast_RHCSim - V_LVsyst_RHCSim) * HR_RHC_Data) / 1000;
             
             % NEXT PERFORM THE ECHO SIMULATION
             % Build a structure with the Echo driver parameters
@@ -265,6 +228,8 @@ function Res = PatSpecHF_ObjFun_MinRuns(p,AllStruct_Struct)
             DriverP_Fields = {'HR' 'period' 'B' 'C'};
             DriverP_Struct = cell2struct(DriverP_Values, ...
                 DriverP_Fields,2);
+            % Calculating timespans to reach steady state
+            TSpan_SS = [0 NumBeats_SS * period];
             % Now set the starting time and ventricular
             %  volumes to start the simulations
             time = 0;
@@ -284,66 +249,110 @@ function Res = PatSpecHF_ObjFun_MinRuns(p,AllStruct_Struct)
             % Set ODE/DAE options and time span
             ODE_Opts = odeset('Mass',M); 
             % Solve over the steady state time span with ode15s
-            [~,X_Echo_Out_SS] = ...
+            [T_Echo_Out,X_Echo_Out] = ...
                 ode15s(@dXdT_Smith,TSpan_SS,X0, ...
                 ODE_Opts,DriverP_Struct,CVParam_Struct);
-            % Now solve over the simulation time span
-            [T_Echo_Out,X_Echo_Out] = ...
-                ode15s(@dXdT_Smith,TSpan_Sim,X_Echo_Out_SS(end,:), ...
-                ODE_Opts,DriverP_Struct,CVParam_Struct);
             
-            % GET SIMULATION VALUES TO COMPARE TO ECHO DATA
-            % Assigning initial low vlaues on systolic and 
-            %  high values on diastolic pressures
-            Num_TOut_EchoSim = size(T_Echo_Out,1);  % Number of time points
-            V_LVsyst_EchoSim = 150;
-            V_LVdiast_EchoSim = 0;
-            % Specifying the number of beats at the end of the Echo simulation
-            %  that we want to calculate the residual from and then finding
-            %  the portion of the simulation to extract values from
-            TimeStart_EchoResCalc = ...
-                (NumBeats_Sim - NumBeats_PlotRes) * period;
-            tIndStart_EchoResCalc = ...
-                find((T_RHC_Out >= TimeStart_EchoResCalc),1,'first');
-            % Looking for systolic and diastolic values in simulation results
-            for i = tIndStart_EchoResCalc:Num_TOut_EchoSim
-                V_LVsyst_EchoSim = min(V_LVsyst_EchoSim,X_Echo_Out(i,1));
-                V_LVdiast_EchoSim = max(V_LVdiast_EchoSim,X_Echo_Out(i,1));
+            % NOW CHECK THAT THE ODES WERE INTEGRATED OVER THE FULL TIME SPAN
+            T_SSRHC = NumBeats_SS * (60/HR_RHC_Data);
+            T_SSEcho = NumBeats_SS * (60/HR_Echo_Data);
+            if ((T_RHC_Out(end) == T_SSRHC) && ...
+                    (T_Echo_Out(end) == T_SSEcho))
+           
+                % GET SIMULATION VALUES TO COMPARE TO RHC DATA
+                % Assigning initial low vlaues on systolic and 
+                %  high values on diastolic pressures
+                P_RVsyst_RHCSim = 0;
+                P_RVdiast_RHCSim = 200;
+                P_PAsyst_RHCSim = 0;
+                P_PAdiast_RHCSim = 150;
+                P_AOsyst_RHCSim = 0;
+                P_AOdiast_RHCSim = 250;
+                V_LVsyst_RHCSim = 150;
+                V_LVdiast_RHCSim = 0;
+                P_PCWave_RHCSum = 0;
+                % Specifying the number of beats at the end of the RHC simulation
+                %  that we want to calculate the residual from and then finding 
+                %  the portion of the simulation to extract values from
+                TimeStart_RHCResCalc = ...
+                    (NumBeats_SS - NumBeats_ResPlot) * period;
+                tIndStart_RHCResCalc = ...
+                    find((T_RHC_Out >= TimeStart_RHCResCalc),1,'first');
+                % Looking for systolic and diastolic values in simulation results
+                for i = tIndStart_RHCResCalc:Num_TOut_RHC
+                    P_RVsyst_RHCSim = max(P_RVsyst_RHCSim,P_RV_RHC(i));
+                    P_RVdiast_RHCSim = min(P_RVdiast_RHCSim,P_RV_RHC(i));
+                    P_PAsyst_RHCSim = max(P_PAsyst_RHCSim,P_PA_RHC(i));
+                    P_PAdiast_RHCSim = min(P_PAdiast_RHCSim,P_PA_RHC(i));
+                    P_AOsyst_RHCSim = max(P_AOsyst_RHCSim,P_AO_RHC(i));
+                    P_AOdiast_RHCSim = min(P_AOdiast_RHCSim,P_AO_RHC(i));
+                    P_PCWave_RHCSum = P_PCWave_RHCSum + P_PU_RHC(i);
+                    V_LVsyst_RHCSim = min(V_LVsyst_RHCSim,X_RHC_Out(i,1));
+                    V_LVdiast_RHCSim = max(V_LVdiast_RHCSim,X_RHC_Out(i,1));
+                end
+                P_PCWave_RHCSim = P_PCWave_RHCSum / ...
+                    (Num_TOut_RHC - tIndStart_RHCResCalc + 1);
+                CO_RHCSim = ...
+                    ((V_LVdiast_RHCSim - V_LVsyst_RHCSim) * ...
+                    HR_RHC_Data) / 1000;
+            
+                % GET SIMULATION VALUES TO COMPARE TO ECHO DATA
+                % Assigning initial low vlaues on systolic and 
+                %  high values on diastolic pressures
+                Num_TOut_Echo = size(T_Echo_Out,1);  % Number of time points
+                V_LVsyst_EchoSim = 150;
+                V_LVdiast_EchoSim = 0;
+                % Specifying the number of beats at the end of the Echo simulation
+                %  that we want to calculate the residual from and then finding
+                %  the portion of the simulation to extract values from
+                TimeStart_EchoResCalc = ...
+                    (NumBeats_SS - NumBeats_ResPlot) * period;
+                tIndStart_EchoResCalc = ...
+                    find((T_Echo_Out >= TimeStart_EchoResCalc),1,'first');
+                % Looking for systolic and diastolic values in simulation results
+                for i = tIndStart_EchoResCalc:Num_TOut_Echo
+                    V_LVsyst_EchoSim = min(V_LVsyst_EchoSim,X_Echo_Out(i,1));
+                    V_LVdiast_EchoSim = max(V_LVdiast_EchoSim,X_Echo_Out(i,1));
+                end
+                % Calculate Echo CO
+                CO_EchoSim = ((V_LVdiast_EchoSim - ...
+                    V_LVsyst_EchoSim) * HR_Echo_Data) / 1000;
+            
+                % NOW CALCULATING THE RESIDUAL FOR BOTH RHC AND ECHO DATA
+                %  Calculate the difference between data and simulation
+                % Right ventricle pressure normalized residual
+                P_RVsyst_Res = abs(P_RVsyst_RHCSim - P_RVsyst_Data) / P_AOsyst_Data;
+                P_RVdiast_Res = abs(P_RVdiast_RHCSim - P_RVdiast_Data) / P_AOsyst_Data;
+                % Pulmonary artery pressure normalized residual
+                P_PAsyst_Res = abs(P_PAsyst_RHCSim - P_PAsyst_Data) / P_AOsyst_Data;
+                P_PAdiast_Res = abs(P_PAdiast_RHCSim - P_PAdiast_Data) / P_AOsyst_Data;
+                % Aortic pressure normalized residual
+                P_AOsyst_Res = abs(P_AOsyst_RHCSim - P_AOsyst_Data) / P_AOsyst_Data;
+                P_AOdiast_Res = abs(P_AOdiast_RHCSim - P_AOdiast_Data) / P_AOsyst_Data;
+                % Pulmonary wedge pressure (in pulmonary vein) normalized residual
+                P_PCWave_Res = abs(P_PCWave_RHCSim - P_PCWave_Data) / P_AOsyst_Data;
+                % Cardiac output normalized residual for both simulations
+                CO_EchoSVHR = ((V_LVdiast_Data - V_LVsyst_Data) * HR_Echo_Data) / 1000;
+                CO_RHCEcho_Max = max([CO_Thermo_Data CO_EchoD_Data CO_EchoSVHR]);
+                CO_RHCRes = abs(CO_RHCSim - CO_Thermo_Data) / CO_RHCEcho_Max;
+                CO_EchoSVHRRes = abs(CO_EchoSim - CO_EchoSVHR) / CO_RHCEcho_Max;
+                CO_EchoDRes = abs(CO_EchoSim - CO_EchoD_Data) / CO_RHCEcho_Max;
+                CO_EchoRes = (CO_EchoSVHRRes + CO_EchoDRes) / 2;
+                % Left ventricular volume normalized residuals
+                V_LVsyst_Res = abs(V_LVsyst_EchoSim - ...
+                    V_LVsyst_Data) / V_LVdiast_Data;
+                V_LVdiast_Res = abs(V_LVdiast_EchoSim - ...
+                    V_LVdiast_Data) / V_LVdiast_Data;
+
+                Res = (P_RVsyst_Res + P_RVdiast_Res + P_PAsyst_Res + ...
+                    P_PAdiast_Res + P_AOsyst_Res + P_AOdiast_Res + ...
+                    P_PCWave_Res + CO_RHCRes + CO_EchoRes + ...
+                    V_LVsyst_Res + V_LVdiast_Res) / 11;
+            else
+                
+                Res = 10;
+                
             end
-            % Calculate Echo CO
-            CO_EchoSim = ((V_LVdiast_EchoSim - ...
-                V_LVsyst_EchoSim) * HR_Echo_Data) / 1000;
-            
-            % NOW CALCULATING THE RESIDUAL FOR BOTH RHC AND ECHO DATA
-            %  Calculate the difference between data and simulation
-            % Right ventricle pressure normalized residual
-            P_RVsyst_Res = abs(P_RVsyst_RHCSim - P_RVsyst_Data) / P_AOsyst_Data;
-            P_RVdiast_Res = abs(P_RVdiast_RHCSim - P_RVdiast_Data) / P_AOsyst_Data;
-            % Pulmonary artery pressure normalized residual
-            P_PAsyst_Res = abs(P_PAsyst_RHCSim - P_PAsyst_Data) / P_AOsyst_Data;
-            P_PAdiast_Res = abs(P_PAdiast_RHCSim - P_PAdiast_Data) / P_AOsyst_Data;
-            % Aortic pressure normalized residual
-            P_AOsyst_Res = abs(P_AOsyst_RHCSim - P_AOsyst_Data) / P_AOsyst_Data;
-            P_AOdiast_Res = abs(P_AOdiast_RHCSim - P_AOdiast_Data) / P_AOsyst_Data;
-            % Pulmonary wedge pressure (in pulmonary vein) normalized residual
-            P_PCWave_Res = abs(P_PCWave_RHCSim - P_PCWave_Data) / P_AOsyst_Data;
-            % Cardiac output normalized residual for both simulations
-            CO_EchoSVHR = ((V_LVdiast_Data - V_LVsyst_Data) * HR_Echo_Data) / 1000;
-            CO_RHCEcho_Max = max([CO_Thermo_Data CO_EchoD_Data CO_EchoSVHR]);
-            CO_RHCRes = abs(CO_RHCSim - CO_Thermo_Data) / CO_RHCEcho_Max;
-            CO_EchoSVHRRes = abs(CO_EchoSim - CO_EchoSVHR) / CO_RHCEcho_Max;
-            CO_EchoDRes = abs(CO_EchoSim - CO_EchoD_Data) / CO_RHCEcho_Max;
-            CO_EchoRes = (CO_EchoSVHRRes + CO_EchoDRes) / 2;
-            % Left ventricular volume normalized residuals
-            V_LVsyst_Res = abs(V_LVsyst_EchoSim - ...
-                V_LVsyst_Data) / V_LVdiast_Data;
-            V_LVdiast_Res = abs(V_LVdiast_EchoSim - ...
-                V_LVdiast_Data) / V_LVdiast_Data;
-    
-            Res = (P_RVsyst_Res + P_RVdiast_Res + P_PAsyst_Res + ...
-                P_PAdiast_Res + P_AOsyst_Res + P_AOdiast_Res + ...
-                P_PCWave_Res + CO_RHCRes + CO_EchoRes + ...
-                V_LVsyst_Res + V_LVdiast_Res) / 11;
             
         catch
             
@@ -380,7 +389,6 @@ function Res = PatSpecHF_ObjFun_MinRuns(p,AllStruct_Struct)
                 DriverP_Fields,2);
             % Calculating timespans to reach steady state and then for simulation
             TSpan_SS = [0 NumBeats_SS * period];
-            TSpan_Sim = [0 NumBeats_Sim * period];
             % Now set the starting time and ventricular
             %  volumes to start the simulations
             time = 0;
@@ -400,82 +408,89 @@ function Res = PatSpecHF_ObjFun_MinRuns(p,AllStruct_Struct)
             % Set ODE/DAE options and time span
             ODE_Opts = odeset('Mass',M); 
             % Solve over the steady state time span with ode15s
-            [~,X_RHC_Out_SS] = ...
+            [T_RHC_Out,X_RHC_Out] = ...
                 ode15s(@dXdT_Smith,TSpan_SS,X0, ...
                 ODE_Opts,DriverP_Struct,CVParam_Struct);
-            % Now solve over the simulation time span
-            [T_RHC_Out,X_RHC_Out] = ...
-                ode15s(@dXdT_Smith,TSpan_Sim,X_RHC_Out_SS(end,:), ...
-                ODE_Opts,DriverP_Struct,CVParam_Struct);
+      
             %  Now run Smith et al. model to get intermediate pressures
-            Num_TOut_RHCSim = size(T_RHC_Out,1);    % Number of time points
-            P_RV_RHCSim = zeros(Num_TOut_RHCSim,1); % Preallocate matrices
-            P_AO_RHCSim = zeros(Num_TOut_RHCSim,1);
-            P_PA_RHCSim = zeros(Num_TOut_RHCSim,1);
-            P_PU_RHCSim = zeros(Num_TOut_RHCSim,1);
+            Num_TOut_RHC = size(T_RHC_Out,1);    % Number of time points
+            P_RV_RHC = zeros(Num_TOut_RHC,1); % Preallocate matrices
+            P_AO_RHC = zeros(Num_TOut_RHC,1);
+            P_PA_RHC = zeros(Num_TOut_RHC,1);
+            P_PU_RHC = zeros(Num_TOut_RHC,1);
             % Use output state variable vector to get pressures
             for i = 1:Num_TOut_RHCSim
                 VarOut = dXdT_Smith(T_RHC_Out(i), ...
                     X_RHC_Out(i,:),DriverP_Struct,CVParam_Struct,1);
-                P_RV_RHCSim(i) = VarOut(2);
-                P_AO_RHCSim(i) = VarOut(3);
-                P_PA_RHCSim(i) = VarOut(5);
-                P_PU_RHCSim(i) = VarOut(6);
+                P_RV_RHC(i) = VarOut(2);
+                P_AO_RHC(i) = VarOut(3);
+                P_PA_RHC(i) = VarOut(5);
+                P_PU_RHC(i) = VarOut(6);
             end
             
-            % GET SIMULATION VALUES TO COMPARE TO DATA
-            % Assigning initial low vlaues on systolic and 
-            %  high values on diastolic pressures
-            P_RVsyst_RHCSim = 0;
-            P_RVdiast_RHCSim = 200;
-            P_PAsyst_RHCSim = 0;
-            P_PAdiast_RHCSim = 150;
-            P_AOsyst_RHCSim = 0;
-            P_AOdiast_RHCSim = 250;
-            V_LVsyst_RHCSim = 150;
-            V_LVdiast_RHCSim = 0;
-            P_PCWave_RHCSum = 0;
-            % Specifying the number of beats at the end of the RHC simulation
-            %  that we want to calculate the residual from and then finding 
-            %  the portion of the simulation to extract values from
-            TimeStart_RHCResCalc = ...
-                (NumBeats_Sim - NumBeats_PlotRes) * period;
-            tIndStart_RHCResCalc = ...
-                find((T_RHC_Out >= TimeStart_RHCResCalc),1,'first');
-            % Looking for systolic and diastolic values in simulation results
-            for i = tIndStart_RHCResCalc:Num_TOut_RHCSim
-                P_RVsyst_RHCSim = max(P_RVsyst_RHCSim,P_RV_RHCSim(i));
-                P_RVdiast_RHCSim = min(P_RVdiast_RHCSim,P_RV_RHCSim(i));
-                P_PAsyst_RHCSim = max(P_PAsyst_RHCSim,P_PA_RHCSim(i));
-                P_PAdiast_RHCSim = min(P_PAdiast_RHCSim,P_PA_RHCSim(i));
-                P_AOsyst_RHCSim = max(P_AOsyst_RHCSim,P_AO_RHCSim(i));
-                P_AOdiast_RHCSim = min(P_AOdiast_RHCSim,P_AO_RHCSim(i));
-                P_PCWave_RHCSum = P_PCWave_RHCSum + P_PU_RHCSim(i);
-                V_LVsyst_RHCSim = min(V_LVsyst_RHCSim,X_RHC_Out(i,1));
-                V_LVdiast_RHCSim = max(V_LVdiast_RHCSim,X_RHC_Out(i,1));
-            end
-            P_PCWave_RHCSim = P_PCWave_RHCSum / Num_TOut_RHCSim;
-            CO_RHCSim = ((V_LVdiast_RHCSim - V_LVsyst_RHCSim) * HR_RHC_Data) / 1000;
+            % NOW CHECK THAT THE ODES WERE INTEGRATED OVER THE FULL TIME SPAN
+            T_SSRHC = NumBeats_SS * (60/HR_RHC_Data);
+            if (T_RHC_Out(end) == T_SSRHC)
             
-            % NOW CALCULATING THE RESIDUAL FOR RHC DATA
-            %  Calculate the difference between data and simulation
-            % Right ventricle pressure normalized residual
-            P_RVsyst_Res = abs(P_RVsyst_RHCSim - P_RVsyst_Data) / P_AOsyst_Data;
-            P_RVdiast_Res = abs(P_RVdiast_RHCSim - P_RVdiast_Data) / P_AOsyst_Data;
-            % Pulmonary artery pressure normalized residual
-            P_PAsyst_Res = abs(P_PAsyst_RHCSim - P_PAsyst_Data) / P_AOsyst_Data;
-            P_PAdiast_Res = abs(P_PAdiast_RHCSim - P_PAdiast_Data) / P_AOsyst_Data;
-            % Aortic pressure normalized residual
-            P_AOsyst_Res = abs(P_AOsyst_RHCSim - P_AOsyst_Data) / P_AOsyst_Data;
-            P_AOdiast_Res = abs(P_AOdiast_RHCSim - P_AOdiast_Data) / P_AOsyst_Data;
-            % Pulmonary wedge pressure (in pulmonary vein) normalized residual
-            P_PCWave_Res = abs(P_PCWave_RHCSim - P_PCWave_Data) / P_AOsyst_Data;
-            % Cardiac output normalized residual
-            CO_Res = abs(CO_RHCSim - CO_Thermo_Data) / CO_Thermo_Data;
-    
-            Res = (P_RVsyst_Res + P_RVdiast_Res + P_PAsyst_Res + ...
-                P_PAdiast_Res + P_AOsyst_Res + P_AOdiast_Res + ...
-                P_PCWave_Res + CO_Res) / 8;
+                % GET SIMULATION VALUES TO COMPARE TO DATA
+                % Assigning initial low vlaues on systolic and 
+                %  high values on diastolic pressures
+                P_RVsyst_RHCSim = 0;
+                P_RVdiast_RHCSim = 200;
+                P_PAsyst_RHCSim = 0;
+                P_PAdiast_RHCSim = 150;
+                P_AOsyst_RHCSim = 0;
+                P_AOdiast_RHCSim = 250;
+                V_LVsyst_RHCSim = 150;
+                V_LVdiast_RHCSim = 0;
+                P_PCWave_RHCSum = 0;
+                % Specifying the number of beats at the end of the RHC simulation
+                %  that we want to calculate the residual from and then finding 
+                %  the portion of the simulation to extract values from
+                TimeStart_RHCResCalc = ...
+                    (NumBeats_Sim - NumBeats_ResPlot) * period;
+                tIndStart_RHCResCalc = ...
+                    find((T_RHC_Out >= TimeStart_RHCResCalc),1,'first');
+                % Looking for systolic and diastolic values in simulation results
+                for i = tIndStart_RHCResCalc:Num_TOut_RHCSim
+                    P_RVsyst_RHCSim = max(P_RVsyst_RHCSim,P_RV_RHC(i));
+                    P_RVdiast_RHCSim = min(P_RVdiast_RHCSim,P_RV_RHC(i));
+                    P_PAsyst_RHCSim = max(P_PAsyst_RHCSim,P_PA_RHC(i));
+                    P_PAdiast_RHCSim = min(P_PAdiast_RHCSim,P_PA_RHC(i));
+                    P_AOsyst_RHCSim = max(P_AOsyst_RHCSim,P_AO_RHC(i));
+                    P_AOdiast_RHCSim = min(P_AOdiast_RHCSim,P_AO_RHC(i));
+                    P_PCWave_RHCSum = P_PCWave_RHCSum + P_PU_RHC(i);
+                    V_LVsyst_RHCSim = min(V_LVsyst_RHCSim,X_RHC_Out(i,1));
+                    V_LVdiast_RHCSim = max(V_LVdiast_RHCSim,X_RHC_Out(i,1));
+                end
+                P_PCWave_RHCSim = P_PCWave_RHCSum / ...
+                    (Num_TOut_RHC - tIndStart_RHCResCalc + 1);
+                CO_RHCSim = ((V_LVdiast_RHCSim - V_LVsyst_RHCSim) * HR_RHC_Data) / 1000;
+
+                % NOW CALCULATING THE RESIDUAL FOR RHC DATA
+                %  Calculate the difference between data and simulation
+                % Right ventricle pressure normalized residual
+                P_RVsyst_Res = abs(P_RVsyst_RHCSim - P_RVsyst_Data) / P_AOsyst_Data;
+                P_RVdiast_Res = abs(P_RVdiast_RHCSim - P_RVdiast_Data) / P_AOsyst_Data;
+                % Pulmonary artery pressure normalized residual
+                P_PAsyst_Res = abs(P_PAsyst_RHCSim - P_PAsyst_Data) / P_AOsyst_Data;
+                P_PAdiast_Res = abs(P_PAdiast_RHCSim - P_PAdiast_Data) / P_AOsyst_Data;
+                % Aortic pressure normalized residual
+                P_AOsyst_Res = abs(P_AOsyst_RHCSim - P_AOsyst_Data) / P_AOsyst_Data;
+                P_AOdiast_Res = abs(P_AOdiast_RHCSim - P_AOdiast_Data) / P_AOsyst_Data;
+                % Pulmonary wedge pressure (in pulmonary vein) normalized residual
+                P_PCWave_Res = abs(P_PCWave_RHCSim - P_PCWave_Data) / P_AOsyst_Data;
+                % Cardiac output normalized residual
+                CO_Res = abs(CO_RHCSim - CO_Thermo_Data) / CO_Thermo_Data;
+
+                Res = (P_RVsyst_Res + P_RVdiast_Res + P_PAsyst_Res + ...
+                    P_PAdiast_Res + P_AOsyst_Res + P_AOdiast_Res + ...
+                    P_PCWave_Res + CO_Res) / 8;
+            else
+                
+                Res = 10;
+                
+            end
             
         catch
             
