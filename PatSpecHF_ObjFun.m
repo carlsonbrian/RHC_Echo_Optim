@@ -26,7 +26,7 @@
 
 function Res = PatSpecHF_ObjFun(p,AllStruct_Struct)
 
-%     warning('off','all')
+    warning('off','all')
 
 %%  Unpack all the passed structures
     if (numel(fieldnames(AllStruct_Struct)) == 6)

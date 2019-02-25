@@ -34,13 +34,36 @@
     tic
     warning('off','all');
     
-    DataStruct = importdata('BCHF14_InputData.txt');
+    DataStruct = importdata('PatData_SimParams_Input-.txt');
     
     FlagData_Vect = DataStruct.data(1:8,1);
     PatData_Vect = DataStruct.data(1:4,2);
     RHCData_Vect = DataStruct.data(1:10,3);
-    if (size(DataStruct.data,2) == 4)
+    if (FlagData_Vect(1) == 1)
         EchoData_Vect = DataStruct.data(1:4,4);
+        if (FlagData_Vect(2) == 1)
+            SimOptSpecs_Vect = DataStruct.data(1:2,5);
+        else
+            if (FlagData_Vect(3) == 1)
+                SimOptSpecs_Vect = DataStruct.data(1:4,5);
+            else
+                SimOptSpecs_Vect = DataStruct.data(1:6,5);
+            end
+            Num_DataRows = size(DataStruct.data,1);
+            AdjParam_Vect = DataStruct.data(1:Num_DataRows,6);
+        end
+    else
+        if (FlagData_Vect(2) == 1)
+            SimOptSpecs_Vect = DataStruct.data(1:2,4);
+        else
+            if (FlagData_Vect(3) == 1)
+                SimOptSpecs_Vect = DataStruct.data(1:4,4);
+            else
+                SimOptSpecs_Vect = DataStruct.data(1:6,4);
+            end
+            Num_DataRows = size(DataStruct.data,1);
+            AdjParam_Vect = DataStruct.data(1:Num_DataRows,5);
+        end
     end
     
     % First we determine what we want to do with this code: optimize to data,
@@ -108,7 +131,7 @@
             RHCData_Fields,2);
         
         % Get the echo data if present in the input file
-        if (size(DataStruct.data,2) == 4)
+        if (RHCEcho_Flag == 1)
             V_LVsyst = EchoData_Vect(1);            % Systolic LV volume (mL)
             V_LVdiast = EchoData_Vect(2);           % Diastolic LV volume (mL)
             HR_Echo	= EchoData_Vect(3);             % Average heart rate (beats/min)
@@ -321,6 +344,20 @@
 %% **********************************************************************************
 %  Opt/Sim Params of    S M I T H   C A R D I O V A S C   M O D E L   S I M / O P T
 % ***********************************************************************************
+
+    % Simulation parameters
+    NumBeats_SS = SimOptSpecs_Vect(1);
+    NumBeats_ResPlot = SimOptSpecs_Vect(2);
+    % Optimization parameters
+    if (HandTune_Flag == 0)
+        fmc_MaxFunEvals = SimOptSpecs_Vect(3);
+        fmc_MaxIter = SimOptSpecs_Vect(4);
+        if (Optim_Flag == 2)
+            ga_PopSize = SimOptSpecs_Vect(5);
+            ga_MaxStallGens = SimOptSpecs_Vect(6);
+        end
+    end
+        
         
     % Pick the parameters we want to adjust with numbers shown below:
     
@@ -363,9 +400,10 @@
     % 37 -> V_0_spt         Septum ED pressure param (mL)
     % 38 -> SVFact          Stressed blood vol factor (uls)     CIRC BLOOD VOLUME
     
-    % SELECT ADJUSTABLE PARAMETERS HERE
-    AdjParams = [3;6;7;8;9;20;24;38];
-    Num_AdjParams = size(AdjParams,1);
+    % Assign the adjustable parameter vector according to input file
+    Num_AdjParams = size(AdjParam_Vect,1) - ...     % Num parameters
+        sum(isnan(AdjParam_Vect));
+    AdjParams = AdjParam_Vect(1:Num_AdjParams);     % Adj params up to first NaN
     
     % Bounds on all possible parameters
     LowBp_All(1) = log(0.01);       % PERICARD &    % Unstr pericard P, P_0_pcd
@@ -467,10 +505,6 @@
         AdjParam_Strngs = {};
         
     end
-
-    % Number of beats to steady state and then for sim/optim
-    NumBeats_SS = 20;
-    NumBeats_ResPlot = 5;
    
     % Building the simulation parameter structure
     SimOptParam_Values = {AdjParam_Strngs NumBeats_SS NumBeats_ResPlot};
@@ -487,7 +521,7 @@
         AllStruct_Struct = cell2struct(AllStruct_Values, ...
         AllStruct_Fields,2);
     else
-        if (size(DataStruct.data,2) == 4)
+        if (RHCEcho_Flag == 1)
             AllStruct_Values = {FlagData_Struct PatData_Struct ...
                 RHCData_Struct EchoData_Struct ...
                 CVParam_Struct SimOptParam_Struct};
@@ -519,8 +553,9 @@
             fmc_Opts.Algorithm = 'active-set';          % Set algorithm type
             fmc_Opts.Display = 'iter';                  % Set display content
             fmc_Opts.TolFun = 1e-10;                    % Set tolerance on function
-            fmc_Opts.MaxFunEvals = 50; %5000;           % Set max num of fun evals
-            fmc_Opts.MaxIter = 10; %100;                % Set max num of iterations
+            fmc_Opts.MaxFunEvals = ... %5000;           % Set max num of fun evals
+                fmc_MaxFunEvals; 
+            fmc_Opts.MaxIter = fmc_MaxIter; %100;       % Set max num of iterations
             if (Parallel_Flag == 1)
                 fmc_Opts.UseParallel = 1;
             end
@@ -536,9 +571,9 @@
             
             % Genetic Algorithm Opimization - Serial computation
             ga_Opts = optimoptions('ga', ...
-                'PopulationSize',25, ...            % 250
+                'PopulationSize',ga_PopSize, ...            % 250
                 'Display','iter', ...
-                'MaxStallGenerations',2);           % 10
+                'MaxStallGenerations',ga_maxStallGens);     % 10
             Num_AdjParams = size(p,2);
             % Set objective function handle and 
             %  identify adjustable parameter vector, p
@@ -559,9 +594,9 @@
                 warning('off','all');
             end  
             ga_Opts = optimoptions('ga', ...
-                'PopulationSize',25, ...            % 250
+                'PopulationSize',ga_PopSize, ...            % 250
                 'Display','iter', ...
-                'MaxStallGenerations',2, ...        % 10
+                'MaxStallGenerations',ga_MaxStallGens, ...  % 10
                 'UseParallel',true);
             Num_AdjParams = size(p,2);
             % Set objective function handle and 
