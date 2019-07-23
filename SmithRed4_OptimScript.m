@@ -18,8 +18,8 @@
 %   ventricular-ventricular interaction, valve inertances, all dead space/zero 
 %   pressure volumes, pericardium and thoracic chambers have been removed.
 %
-%   Model originally created on     17   January 2016
-%   Model last modfied on           20 September 2018
+%   Model originally created on     17 January 2016
+%   Model last modfied on           16    July 2019
 
 %   Developed by        Brian Carlson
 %                       Physiological Systems Dynamics Laboratory
@@ -37,20 +37,53 @@
     tic
     warning('off','all');
     
+    DataStruct = importdata('BCHF1Red4_InputData.txt');
+    
+    FlagData_Vect = DataStruct.data(1:8,1);                 % Flags controlling code
+    PatData_Vect = DataStruct.data(1:4,2);                  % General patient data
+    RHCData_Vect = DataStruct.data(1:10,3);                 % RHC data
+    if (FlagData_Vect(1) == 1)                              % RHC+Echo data present
+        EchoData_Vect = DataStruct.data(1:4,4);             % Echo data
+        if (FlagData_Vect(2) == 1)
+            SimOptSpecs_Vect = DataStruct.data(1:2,5);      % Hand tune sim beats
+        else                                                %  and plot beats 
+            if (FlagData_Vect(3) == 1)
+                SimOptSpecs_Vect = DataStruct.data(1:4,5);  % fmc optim sim, optim
+            else                                            %  beats and fmc specs
+                SimOptSpecs_Vect = DataStruct.data(1:6,5);  % GA optim sim, optim
+            end                                             %  beats and GA specs
+            Num_DataRows = size(DataStruct.data,1);         % Find num of adj params
+            AdjParam_Vect = ...                             % Load adj parameter
+                DataStruct.data(1:Num_DataRows,6);          %  numbers
+        end
+    else                                                    % RHC data only present
+        if (FlagData_Vect(2) == 1)
+            SimOptSpecs_Vect = DataStruct.data(1:2,4);      % Hand tune sim beats
+        else                                                %  and plot beats 
+            if (FlagData_Vect(3) == 1)
+                SimOptSpecs_Vect = DataStruct.data(1:4,4);  % fmc optim sim, optim
+            else                                            %  beats and fmc specs
+                SimOptSpecs_Vect = DataStruct.data(1:6,4);  % GA optim sim, optim
+            end                                             %  beats and GA specs
+            Num_DataRows = size(DataStruct.data,1);         % Find num of adj params
+            AdjParam_Vect = ...                             % Load adj parameter
+                DataStruct.data(1:Num_DataRows,5);          %  numbers
+        end
+    end
+    
     % First we determine what we want to do with this code: optimize to data,
     %  compare to Smith model simulation, hand fit, run Smith model params and
     %  save output, or plot out a previous optimized fit. Specific detail on
     %  flag values for each option are given above in the script header
-    RHCEcho_Flag = 1;                           % RHC + Echo = 1, RHC only = 2
-    HandTune_Flag = 1;                          % 1 = Hnd tne or sim, 0 = Opt & sim
-    Optim_Flag = 0;                             % 1 = fmincon, 2 = Genetic alg
-    Parallel_Flag = 0;                          % 1 = Parallel, 0 = Serial optim
-    OptimBest_Flag = 0;                         % 1 = Optim p Run 0 = Opt or Other
-    SmithParam_Flag = 0;                        % Run Smith params = 1, not = 0
-    SaveSmith_Flag = 0;                         % Save Smith run = 1, not = 0
-    Comp2Smith_Flag = 1;                        % Compare to Smith = 1, not = 0   
-    
-    % Save all flag data so it can be passed to functions
+    RHCEcho_Flag = FlagData_Vect(1);            % RHC + Echo = 1, RHC only = 2
+    HandTune_Flag = FlagData_Vect(2);           % 1 = Hnd tne or sim, 0 = Opt & sim
+    Optim_Flag = FlagData_Vect(3);              % 1 = fmincon, 2 = Genetic alg
+    Parallel_Flag = FlagData_Vect(4);           % 1 = Parallel, 0 = Serial optim
+    OptimBest_Flag = FlagData_Vect(5);          % 1 = Optim p Run 0 = Opt or Other
+    SmithParam_Flag = FlagData_Vect(6);         % Run Smith params = 1, not = 0
+    SaveSmith_Flag = FlagData_Vect(7);          % Save Smith run = 1, not = 0
+    Comp2Smith_Flag = FlagData_Vect(8);         % Compare to Smith = 1, not = 0   
+    % Save all flag data in a structure to be passed to functions
     FlagData_Values = {HandTune_Flag OptimBest_Flag Optim_Flag ...
         Parallel_Flag RHCEcho_Flag SmithParam_Flag ...
         Comp2Smith_Flag SaveSmith_Flag};
@@ -59,79 +92,72 @@
         'SmithParam_Flag' 'Comp2Smith_Flag' 'SaveSmith_Flag'};
     FlagData_Struct = cell2struct(FlagData_Values, ...
                 FlagData_Fields,2);
-            
-            
+   
 %% **********************************************************************************
 %  Patient Data for     S M I T H   C A R D I O V A S C   M O D E L   S I M / O P T
-% ***********************************************************************************
+% ***********************************************************************************            
             
-    if (RHCEcho_Flag == 1 && SmithParam_Flag == 0)
-            
-        DID_Num = 'BCHF1';                      % Deidentified subject number
-        P_RVsyst = 46;                          % Systolic RV pressure (mmHg)     *
-        P_RVdiast = 10;                         % Diastolic RV pressure (mmHg)    *
-        P_PAsyst = 44;                          % Systolic pulm art press (mmHg)  *
-       	P_PAdiast = 20;                         % Diast pulm art press (mmHg)     *
-       	P_PCWave = 19;                          % Average pulm wedge press (mmHg) * 
-       	P_AOsyst = 166;                         % Systolic aortic press (mmHg)    *
-       	P_AOdiast = 65;                         % Diastolic aortic press (mmHg)   *
-       	Ave_HR = 56;                            % Average heart rate (beats/min)
-       	CO_Fick = 6.13;                         % Cardiac output Fick (L/min)     *
-       	CO_Thermo = 6.10;                       % Cardiac outpt thermodil (L/min) *
-       	V_LVsyst = 99.0;                        % Systolic LV volume (mL)         *
-        V_LVdiast = 210.0;                      % Diastolic LV volume (mL)        *
-        BW = 107.4;                             % Body weight (kg)
-        Hgt = 160;                              % Height (cm)
-        Gender = 'F';                           % Gender (M or F)
-            
-        PatData_Values = {RHCEcho_Flag DID_Num P_RVsyst ...
-            P_RVdiast P_PAsyst P_PAdiast P_PCWave P_AOsyst ...
-            P_AOdiast Ave_HR CO_Fick CO_Thermo V_LVsyst ...
-            V_LVdiast BW Hgt Gender};
-        PatData_Fields = {'RHCEcho_Flag' 'DID_Num' 'P_RVsyst' ...
-            'P_RVdiast' 'P_PAsyst' 'P_PAdiast' 'P_PCWave' ...
-            'P_AOsyst' 'P_AOdiast' 'Ave_HR' 'CO_Fick' 'CO_Thermo' ...
-            'V_LVsyst' 'V_LVdiast' 'BW' 'Hgt' 'Gender'};
+    if (SmithParam_Flag == 0)
+           
+        % We are running patient data simulation or optimization so get the 
+        % general data of study patient number, weight, height and sex
+        DID_Num = ...                               % Deidentified subject number
+            ['BCHF' num2str(PatData_Vect(1))];                     
+        BW = PatData_Vect(2);                       % Body weight (kg)
+        Hgt = PatData_Vect(3);                      % Height (cm)
+        if (PatData_Vect(4) == 1)                   % Sex (M or F)
+            Sex = 'M';  
+        else
+            Sex = 'F';
+        end
+        % Save all patient data into a structure to be passed to functions
+        PatData_Values = {DID_Num BW Hgt Sex};
+        PatData_Fields = {'DID_Num' 'BW' 'Hgt' 'Sex'};
         PatData_Struct = cell2struct(PatData_Values, ...
             PatData_Fields,2);
-        	
-    elseif (RHCEcho_Flag == 0 && SmithParam_Flag == 0)
-        	
-        DID_Num = 'BCHF1';                      % Deidentified subject number
-		P_RVsyst = 46;                          % Systolic RV pressure (mmHg)     *
-        P_RVdiast = 10;                         % Diastolic RV pressure (mmHg)    *
-        P_PAsyst = 44;                          % Systolic pulm art press (mmHg)  *
-        P_PAdiast = 20;                         % Diast pulm art press (mmHg)     *
-        P_PCWave = 19;                          % Average pulm wedge press (mmHg) * 
-        P_AOsyst = 166;                         % Systolic aortic press (mmHg)    *
-        P_AOdiast = 65;                         % Diastolic aortic press (mmHg)   *
-        Ave_HR = 56;                            % Average heart rate (beats/min)
-        CO_Fick = 6.13;                         % Cardiac output Fick (L/min)     *
-        CO_Thermo = 6.10;                       % Cardiac outpt thermodil (L/min) *
-        BW = 107.4;                             % Body weight (kg)
-        Hgt = 160;                              % Height (cm)
-        Gender = 'F';                           % Gender (M or F)
         
-        PatData_Values = {RHCEcho_Flag DID_Num P_RVsyst ...
-            P_RVdiast P_PAsyst P_PAdiast P_PCWave P_AOsyst ...
-            P_AOdiast Ave_HR CO_Fick CO_Thermo BW Hgt Gender};
-        PatData_Fields = {'RHCEcho_Flag' 'DID_Num' 'P_RVsyst' ...
-            'P_RVdiast' 'P_PAsyst' 'P_PAdiast' 'P_PCWave' ...
-            'P_AOsyst' 'P_AOdiast' 'Ave_HR' 'CO_Fick' ...
-            'CO_Thermo' 'BW' 'Hgt' 'Gender'};
-        PatData_Struct = cell2struct(PatData_Values, ...
-            PatData_Fields,2);
+        % Now get the RHC data which will be present for all patients
+        P_RVsyst = RHCData_Vect(1);                 % Systolic RV pressure (mmHg) 
+        P_RVdiast = RHCData_Vect(2);                % Diastolic RV pressure (mmHg)
+        P_PAsyst = RHCData_Vect(3);                 % Systolic pulm art press (mmHg)
+       	P_PAdiast = RHCData_Vect(4);                % Diast pulm art press (mmHg)
+       	P_PCWave = RHCData_Vect(5);                 % Average pulm wedge press (mmHg)
+       	P_AOsyst = RHCData_Vect(6);                 % Systolic aortic press (mmHg)
+       	P_AOdiast = RHCData_Vect(7);                % Diastolic aortic press (mmHg)
+       	HR_RHC = RHCData_Vect(8);                   % Average heart rate (beats/min)
+       	CO_Fick = RHCData_Vect(9);                  % Cardiac output Fick (L/min)
+       	CO_Thermo = RHCData_Vect(10);               % Cardiac outpt thermodil (L/min)
+        % Save all RHC data into a structure to be passed to functions
+        RHCData_Values = {P_RVsyst P_RVdiast P_PAsyst P_PAdiast ....
+            P_PCWave P_AOsyst P_AOdiast HR_RHC CO_Fick CO_Thermo};
+        RHCData_Fields = {'P_RVsyst' 'P_RVdiast' 'P_PAsyst' 'P_PAdiast' ....
+            'P_PCWave' 'P_AOsyst' 'P_AOdiast' 'HR_RHC' 'CO_Fick' 'CO_Thermo'};
+        RHCData_Struct = cell2struct(RHCData_Values, ...
+            RHCData_Fields,2);
+        
+        % Get the echo data if present in the input file
+        if (RHCEcho_Flag == 1)
+            V_LVsyst = EchoData_Vect(1);            % Systolic LV volume (mL)
+            V_LVdiast = EchoData_Vect(2);           % Diastolic LV volume (mL)
+            HR_Echo	= EchoData_Vect(3);             % Average heart rate (beats/min)
+            CO_EchoD = EchoData_Vect(4);            % Cardiac output Echo-Dop (L/min)
+            % Save all Echo data into a structure to be passed to functions
+            EchoData_Values = {V_LVsyst V_LVdiast HR_Echo CO_EchoD};
+            EchoData_Fields = {'V_LVsyst' 'V_LVdiast' 'HR_Echo' 'CO_EchoD'};
+            EchoData_Struct = cell2struct(EchoData_Values, ...
+                EchoData_Fields,2);
+        end
         
     else
         
         DID_Num = 'Normal';
-        Ave_HR = 80;                            % Average heart rate (beats/min)
-        BW = 72.3;                              % Body weight (kg, ~160 lbs)
-        Hgt = 178;                              % Height (cm, ~5'10")
-        Gender = 'M';                           % Assuming male since TotBV ~ 5L
+        HR_Smith = 80;                              % Average heart rate (beats/min)
+        BW = 72.3;                                  % Body weight (kg, ~160 lbs)
+        Hgt = 178;                                  % Height (cm, ~5'10")
+        Sex = 'M';                                  % Assuming male since TotBV ~ 5L
         
-        PatData_Values = {DID_Num Ave_HR BW Hgt Gender};
-        PatData_Fields = {'DID_Num' 'Ave_HR' 'BW' 'Hgt' 'Gender'};
+        PatData_Values = {DID_Num HR_Smith BW Hgt Sex};
+        PatData_Fields = {'DID_Num' 'HR_Smith' 'BW' 'Hgt' 'Sex'};
         PatData_Struct = cell2struct(PatData_Values, ...
             PatData_Fields,2);
         
@@ -142,15 +168,11 @@
 %  Fixed Params of      S M I T H   C A R D I O V A S C   M O D E L   S I M / O P T
 % ***********************************************************************************
     
-    % Elastance function driver parameters
-    period = 60/Ave_HR;                             % Period of heart beat (s)
-    A = 1;                                          % Elastance function param (uls)
-    B = Ave_HR;                                     % Elastance fctn param (1/s^2)
-    C = period/2;                                   % Elastance fctn param (s)
-    
     if (SmithParam_Flag == 1)
          
         % SMITH ET AL. MODEL PARAMETERS
+        % Elastance function driver parameters
+        A = 1;                                      % Elastance function param (uls)
         % Pericardium calculation parameters
         P_0_pcd = 0.5003;                           % Unstress pericard press (mmHg)
         lambda_pcd = 0.03;                          % Pericard press exp term (1/mL)
@@ -199,17 +221,17 @@
         SVFact = 1.00;                              % Stress blood vol factor (uls)
         
         % Save all parameters in a sturcture to pass
-        CVParam_Values = {period A B C P_0_pcd lambda_pcd V_0_pcd P_th E_es_lvf ...
-            V_d_lvf P_0_lvf lambda_lvf V_0_lvf E_es_rvf V_d_rvf P_0_rvf ...
-            lambda_rvf V_0_rvf E_es_pa V_d_pa E_es_pu V_d_pu R_pul E_es_ao ...
-            V_d_ao E_es_vc V_d_vc R_sys R_mt L_mt R_av L_av R_tc L_tc R_pv L_pv ...
+        CVParam_Values = {A P_0_pcd lambda_pcd V_0_pcd P_th E_es_lvf V_d_lvf ...
+            P_0_lvf lambda_lvf V_0_lvf E_es_rvf V_d_rvf P_0_rvf lambda_rvf ...
+            V_0_rvf E_es_pa V_d_pa E_es_pu V_d_pu R_pul E_es_ao V_d_ao ...
+            E_es_vc V_d_vc R_sys R_mt L_mt R_av L_av R_tc L_tc R_pv L_pv ...
             E_es_spt V_d_spt P_0_spt lambda_spt V_0_spt SVFact};
-        CVParam_Fields = {'period' 'A' 'B' 'C' 'P_0_pcd' 'lambda_pcd' 'V_0_pcd' ...
-            'P_th' 'E_es_lvf' 'V_d_lvf' 'P_0_lvf' 'lambda_lvf' 'V_0_lvf' ...
-            'E_es_rvf' 'V_d_rvf' 'P_0_rvf' 'lambda_rvf' 'V_0_rvf' 'E_es_pa' ...
-            'V_d_pa' 'E_es_pu' 'V_d_pu' 'R_pul' 'E_es_ao' 'V_d_ao' 'E_es_vc' ...
-            'V_d_vc' 'R_sys' 'R_mt' 'L_mt' 'R_av' 'L_av' 'R_tc' 'L_tc' 'R_pv' ...
-            'L_pv' 'E_es_spt' 'V_d_spt' 'P_0_spt' 'lambda_spt' 'V_0_spt' 'SVFact'};
+        CVParam_Fields = {'A' 'P_0_pcd' 'lambda_pcd' 'V_0_pcd' 'P_th' ...
+            'E_es_lvf' 'V_d_lvf' 'P_0_lvf' 'lambda_lvf' 'V_0_lvf' 'E_es_rvf' ...
+            'V_d_rvf' 'P_0_rvf' 'lambda_rvf' 'V_0_rvf' 'E_es_pa' 'V_d_pa' ...
+            'E_es_pu' 'V_d_pu' 'R_pul' 'E_es_ao' 'V_d_ao' 'E_es_vc' 'V_d_vc' ...
+            'R_sys' 'R_mt' 'L_mt' 'R_av' 'L_av' 'R_tc' 'L_tc' 'R_pv' 'L_pv' ...
+            'E_es_spt' 'V_d_spt' 'P_0_spt' 'lambda_spt' 'V_0_spt' 'SVFact'};
         CVParam_Struct = cell2struct(CVParam_Values,CVParam_Fields,2);
         
     else
@@ -217,44 +239,48 @@
         if (OptimBest_Flag == 0)
             
             % MODEL PARAMETERS TO ADJUST
+            % Elastance function driver parameters
+            A = 1;                                  % Elastance function param (uls)
             % Left ventricle free wall parameters
-            E_es_lvf = 2.8798 * 0.580;              % LV free wall elast (mmHg/mL) 
+            E_es_lvf = 2.8798; % * 0.580;           % LV free wall elast (mmHg/mL) 
             P_0_lvf = 0.1203;                       % LV ED pressure param (mmHg)
-            lambda_lvf = 0.033 * 0.465;              % LV ED pressure param (1/mL)
+            lambda_lvf = 0.033; % * 0.465;          % LV ED pressure param (1/mL)
             % Right ventricle free wall parameters
-            E_es_rvf = 0.585 * 0.75;                % RV free wall elast (mmHg/mL) 
+            E_es_rvf = 0.585; % * 0.75;             % RV free wall elast (mmHg/mL) 
             P_0_rvf = 0.2157;                       % RV ED pressure param (mmHg)
-            lambda_rvf = 0.023 * 0.525;              % RV ED pressure param (1/mL)
+            lambda_rvf = 0.023; % * 0.525;          % RV ED pressure param (1/mL)
             % Pulmonary artery and vein parameters
-            E_es_pa = 0.369 * 0.70;                 % Pulm artery elastance (mmHg/mL)
-            E_es_pu = 0.0073 * 75.00;               % Pulm vein elastance (mmHg/mL)
-            R_pul = 0.1552 * 1.35;                  % Pulm vasc resist (mmHg*s/mL)
+            E_es_pa = 0.369; % * 0.70;              % Pulm artery elastance (mmHg/mL)
+            E_es_pu = 0.0073; % * 75.00;            % Pulm vein elastance (mmHg/mL)
+            R_pul = 0.1552; % * 1.35;               % Pulm vasc resist (mmHg*s/mL)
             % Aortic and vena cava parameters
-            E_es_ao = 0.6913 * 1.675;               % Aorta elastance (mmHg/mL)
+            E_es_ao = 0.6913; % * 1.675;            % Aorta elastance (mmHg/mL)
             E_es_vc = 0.0059;                       % Vena cava elastance (mmHg/mL)
-            R_sys = 1.0889 * 0.95;                  % Syst art resistance (mmHg*s/mL)
+            R_sys = 1.0889; % * 0.95;               % Syst art resistance (mmHg*s/mL)
             % Heart valve paramenters
             R_mt = 0.0158;                          % Mitral valve resist (mmHg*s/mL)
             R_av = 0.018;                           % Aortic valve resist (mmHg*s/mL)
             R_tc = 0.0237;                          % Tricspd vlv resist (mmHg*s/mL)
-            R_pv = 0.0055 * 1.5;                    % Pulmon vlv resist (mmHg*s/mL)
+            R_pv = 0.0055; % * 1.5;                 % Pulmon vlv resist (mmHg*s/mL)
             % Heart failure param
             SVFact = 1.00;                          % Stress blood vol factor (uls)
             
             % Save all parameters in a sturcture to pass
-            CVParam_Values = {period A B C E_es_lvf P_0_lvf ...
-                lambda_lvf E_es_rvf P_0_rvf lambda_rvf E_es_pa ...
-                E_es_pu R_pul E_es_ao E_es_vc R_sys R_mt R_av ...
-                R_tc R_pv SVFact};
-            CVParam_Fields = {'period' 'A' 'B' 'C' 'E_es_lvf' 'P_0_lvf' ...
-                'lambda_lvf' 'E_es_rvf' 'P_0_rvf' 'lambda_rvf' ...
-                'E_es_pa' 'E_es_pu' 'R_pul' 'E_es_ao' 'E_es_vc' ...
-                'R_sys' 'R_mt' 'R_av' 'R_tc' 'R_pv' 'SVFact'};
+            CVParam_Values = {A E_es_lvf P_0_lvf lambda_lvf E_es_rvf ...
+                P_0_rvf lambda_rvf E_es_pa E_es_pu R_pul E_es_ao ...
+                E_es_vc R_sys R_mt R_av R_tc R_pv SVFact};
+                
+            CVParam_Fields = {'A' 'E_es_lvf' 'P_0_lvf' 'lambda_lvf' ...
+                'E_es_rvf' 'P_0_rvf' 'lambda_rvf' 'E_es_pa' ...
+                'E_es_pu' 'R_pul' 'E_es_ao' 'E_es_vc' 'R_sys' ...
+                'R_mt' 'R_av' 'R_tc' 'R_pv' 'SVFact'};
             CVParam_Struct = cell2struct(CVParam_Values,CVParam_Fields,2);
         
         else
         
             % LOAD THE OPTIM PARAMS FROM AN EARLIER RUN
+            % Elastance function driver parameters
+            A = 1;                                  % Elastance function param (uls)
             % Left ventricle free wall parameters
             E_es_lvf = 2.8798;                      % LV free wall elast (mmHg/mL) 
             P_0_lvf = 0.0835; % 0.1203;             % LV ED pressure param (mmHg)
@@ -280,14 +306,14 @@
             SVFact = 2.4947; %1.00;                 % Stress blood vol factor (uls)
             
             % Save all parameters in a structure to pass
-            CVParam_Values = {period A B C E_es_lvf P_0_lvf ...
-                lambda_lvf E_es_rvf P_0_rvf lambda_rvf E_es_pa ...
-                E_es_pu R_pul E_es_ao E_es_vc R_sys R_mt R_av ...
-                R_tc R_pv SVFact};
-            CVParam_Fields = {'period' 'A' 'B' 'C' 'E_es_lvf' 'P_0_lvf' ...
-                'lambda_lvf' 'E_es_rvf' 'P_0_rvf' 'lambda_rvf' ...
-                'E_es_pa' 'E_es_pu' 'R_pul' 'E_es_ao' 'E_es_vc' ...
-                'R_sys' 'R_mt' 'R_av' 'R_tc' 'R_pv' 'SVFact'};
+            CVParam_Values = {A E_es_lvf P_0_lvf lambda_lvf ...
+                E_es_rvf P_0_rvf lambda_rvf E_es_pa E_es_pu R_pul ...
+                E_es_ao E_es_vc R_sys R_mt R_av R_tc R_pv SVFact};
+                
+            CVParam_Fields = {'A' 'E_es_lvf' 'P_0_lvf' 'lambda_lvf' ...
+                'E_es_rvf' 'P_0_rvf' 'lambda_rvf' 'E_es_pa' ...
+                'E_es_pu' 'R_pul' 'E_es_ao' 'E_es_vc' 'R_sys' ...
+                'R_mt' 'R_av' 'R_tc' 'R_pv' 'SVFact'};
             CVParam_Struct = cell2struct(CVParam_Values,CVParam_Fields,2);
             
         end
@@ -298,7 +324,20 @@
 %% **********************************************************************************
 %  Opt/Sim Params of    S M I T H   C A R D I O V A S C   M O D E L   S I M / O P T
 % ***********************************************************************************
-        
+
+    % Simulation parameters
+    NumBeats_SS = SimOptSpecs_Vect(1);
+    NumBeats_ResPlot = SimOptSpecs_Vect(2);
+    % Optimization parameters
+    if (HandTune_Flag == 0)
+        fmc_MaxFunEvals = SimOptSpecs_Vect(3);
+        fmc_MaxIter = SimOptSpecs_Vect(4);
+        if (Optim_Flag == 2)
+            ga_PopSize = SimOptSpecs_Vect(5);
+            ga_MaxStallGens = SimOptSpecs_Vect(6);
+        end
+    end
+
     % Pick the parameters we want to adjust with numbers shown below:
     
     % 1 --> E_es_lvf        LV free wall elast (mmHg/mL)        LEFT VENTRICLE
@@ -319,9 +358,10 @@
     % 16 -> R_pv            Pulmon vlv resist (mmHg*s/mL)
     % 17 -> SVFact          Stressed blood vol factor (uls)     CIRC BLOOD VOLUME
     
-    % SELECT ADJUSTABLE PARAMETERS HERE
-    AdjParams = [3;6;7;8;9;20;24];
-    Num_AdjParams = size(AdjParams,1);
+    % Assign the adjustable parameter vector according to input file
+    Num_AdjParams = size(AdjParam_Vect,1) - ...     % Num parameters
+        sum(isnan(AdjParam_Vect));
+    AdjParams = AdjParam_Vect(1:Num_AdjParams);     % Adj params up to first NaN
     
     % Bounds on all possible parameters
     LowBp_All(1) = log(0.100);      % LEFT          % LV free wall elast, E_es_lvf
@@ -370,8 +410,8 @@
         UpBp = zeros(Num_AdjParams,1);
         for i = 1:Num_AdjParams
             ParamNum = AdjParams(i);
-            p(i) = log(CVParam_Values{ParamNum+4});
-            AdjParam_Strngs(i,1) = CVParam_Fields(ParamNum+4);
+            p(i) = log(CVParam_Values{ParamNum+1});
+            AdjParam_Strngs(i,1) = CVParam_Fields(ParamNum+1);
             LowBp(i) = LowBp_All(ParamNum);
             UpBp(i) = UpBp_All(ParamNum);
         end
@@ -382,17 +422,39 @@
         
     end
 
-    % Simulation time scales
-    NumBeats_SS = 25;
-    NumBeats_Sim = 5; 
-    TSpan_SS = [0 NumBeats_SS * period];
-    TSpan_Sim = [0 NumBeats_Sim * period];
-    
     % Building the simulation parameter structure
-    SimOptParam_Values = {AdjParam_Strngs TSpan_SS TSpan_Sim};
-    SimOptParam_Fields = {'AdjParam_Strngs' 'TSpan_SS' 'TSpan_Sim'};
+    SimOptParam_Values = {AdjParam_Strngs NumBeats_SS NumBeats_ResPlot};
+    SimOptParam_Fields = {'AdjParam_Strngs' 'NumBeats_SS' 'NumBeats_ResPlot'};
     SimOptParam_Struct = cell2struct(SimOptParam_Values, ...
         SimOptParam_Fields,2);
+    
+    % Now put all structures into a single structure to pass
+    if (SmithParam_Flag == 1)
+        AllStruct_Values = {FlagData_Struct PatData_Struct ...
+            CVParam_Struct SimOptParam_Struct};
+        AllStruct_Fields = {'FlagData_Struct' 'PatData_Struct' ...
+            'CVParam_Struct' 'SimOptParam_Struct'};
+        AllStruct_Struct = cell2struct(AllStruct_Values, ...
+        AllStruct_Fields,2);
+    else
+        if (RHCEcho_Flag == 1)
+            AllStruct_Values = {FlagData_Struct PatData_Struct ...
+                RHCData_Struct EchoData_Struct ...
+                CVParam_Struct SimOptParam_Struct};
+            AllStruct_Fields = {'FlagData_Struct' 'PatData_Struct' ...
+                'RHCData_Struct' 'EchoData_Struct' ...
+                'CVParam_Struct' 'SimOptParam_Struct'};
+            AllStruct_Struct = cell2struct(AllStruct_Values, ...
+            AllStruct_Fields,2);
+        else
+            AllStruct_Values = {FlagData_Struct PatData_Struct ...
+                RHCData_Struct CVParam_Struct SimOptParam_Struct};
+            AllStruct_Fields = {'FlagData_Struct' 'PatData_Struct' ...
+                'RHCData_Struct' 'CVParam_Struct' 'SimOptParam_Struct'};
+            AllStruct_Struct = cell2struct(AllStruct_Values, ...
+            AllStruct_Fields,2);
+        end
+    end
         
         
 %% **********************************************************************************
@@ -408,8 +470,9 @@
             fmc_Opts.Algorithm = 'active-set';          % Set algorithm type
             fmc_Opts.Display = 'iter';                  % Set display content
             fmc_Opts.TolFun = 1e-10;                    % Set tolerance on function
-            fmc_Opts.MaxFunEvals = 5000;                % Set max num of fun evals
-            fmc_Opts.MaxIter = 100;                     % Set max num of iterations
+            fmc_Opts.MaxFunEvals = ... %5000;           % Set max num of fun evals
+                fmc_MaxFunEvals; 
+            fmc_Opts.MaxIter = fmc_MaxIter; %100;       % Set max num of iterations
             if (Parallel_Flag == 1)
                 fmc_Opts.UseParallel = 1;
             end
@@ -418,28 +481,26 @@
         if (Optim_Flag == 1)
             
             % fmincon optimization call
-            p_Optim = fmincon(@Smith_ObjFun,p,[],[],[],[], ...
-                LowBp,UpBp,[],fmc_Opts,PatData_Struct, ...
-                CVParam_Struct,SimOptParam_Struct);
+            p_Optim = fmincon(@PatSpcHFRed4_ObjFun,p,[],[],[],[], ...
+                LowBp,UpBp,[],fmc_Opts,AllStruct_Struct);
             
         elseif (Optim_Flag == 2 && Parallel_Flag == 0)
             
             % Genetic Algorithm Opimization - Serial computation
             ga_Opts = optimoptions('ga', ...
-                'PopulationSize',250, ...
+                'PopulationSize',ga_PopSize, ...            % 250
                 'Display','iter', ...
-                'MaxStallGenerations',10);
+                'MaxStallGenerations',ga_maxStallGens);     % 10
             Num_AdjParams = size(p,2);
             % Set objective function handle and 
             %  identify adjustable parameter vector, p
-            Smith_ObjFun_Hndl = @(p) Smith_ObjFun(p, ...
-                PatData_Struct,CVParam_Struct,SimOptParam_Struct);
+            PatSpecHFRed4_ObjFun_Hndl = ...
+                @(p) PatSpecHFRed4_ObjFun(p,AllStruct_Struct);
             % Optimization call
-            p_OptimGA = ga(Smith_ObjFun_Hndl,Num_AdjParams,[],[],[],[], ...
+            p_OptimGA = ga(PatSpecHFRed4_ObjFun_Hndl,Num_AdjParams,[],[],[],[], ...
                 LowBp,UpBp,[],ga_Opts);
-            p_Optim = fmincon(@Smith_ObjFun,p_OptimGA,[],[],[],[], ...
-                LowBp,UpBp,[],fmc_Opts,PatData_Struct, ...
-                CVParam_Struct,SimOptParam_Struct);
+            p_Optim = fmincon(@PatSpecHFRed4_ObjFun,p_OptimGA,[],[],[],[], ...
+                LowBp,UpBp,[],fmc_Opts,AllStruct_Struct);
             
         else
             
@@ -451,21 +512,20 @@
                 warning('off','all');
             end  
             ga_Opts = optimoptions('ga', ...
-                'PopulationSize',250, ...
+                'PopulationSize',ga_PopSize, ...            % 250
                 'Display','iter', ...
-                'MaxStallGenerations',10, ...
+                'MaxStallGenerations',ga_MaxStallGens, ...  % 10
                 'UseParallel',true);
             Num_AdjParams = size(p,2);
             % Set objective function handle and 
             %  identify adjustable parameter vector, p
-            Smith_ObjFun_Hndl = @(p) Smith_ObjFun(p, ...
-                PatData_Struct,CVParam_Struct,SimOptParam_Struct);
+            PatSpecHFRed4_ObjFun_Hndl = ...
+                @(p) PatSpecHFRed4_ObjFun(p,AllStruct_Struct);
             % Optimization call
-            p_OptimGA = ga(Smith_ObjFun_Hndl,Num_AdjParams,[],[],[],[], ...
-                LowBp,UpBp,[],ga_Opts);
-            p_Optim = fmincon(@Smith_ObjFun,p_OptimGA,[],[],[],[], ...
-                LowBp,UpBp,[],fmc_Opts,PatData_Struct, ...
-                CVParam_Struct,SimOptParam_Struct);
+            p_OptimGA = ga(PatSpecHFRed4_ObjFun_Hndl,Num_AdjParams, ...
+                [],[],[],[],LowBp,UpBp,[],ga_Opts);
+            p_Optim = fmincon(@PatSpecHFRed4_ObjFun,p_OptimGA,[], ...
+                [],[],[],LowBp,UpBp,[],fmc_Opts,AllStruct_Struct);
             
             % Overwrite initial adjustable parameter values with optimized values
             Num_AdjParams = size(p,2);
@@ -488,48 +548,41 @@
 %  Run Simulation of    S M I T H   C A R D I O V A S C   M O D E L   S I M / O P T
 % ***********************************************************************************
            
-    % Calculate total blood volume based on height, weight and gender. 
-    %  This expression is from Nadler et al. Surgery 51:224,1962.
-    if (Gender == 'M')
-        TotBV = ((0.3669 * (Hgt/100)^3) + ...
-            (0.03219 * BW) + 0.6041) * 1000;
-    else
-        TotBV = ((0.3561 * (Hgt/100)^3) + ...
-            (0.03308 * BW) + 0.1833) * 1000;
-    end
-    
-    % The original Smith model only circulated a portion of the blood so aortic
-    %  pressure dynamics are not lumped into a general arterial systemic 
-    %  compartment. Assuming they were simulating a typical 5000 mL total blood 
-    %  volume they included only 1500 mL (or 30%) in the circulating volume
-    %  therefore we will multiply our calculated TotBV value by 0.3 to yield 
-    %  circulating blood volume. To account for extra recruited volume in heart
-    %  disease the 30% circulating blood volume can be altered by changing SVFact
-    CircBV = SVFact * 0.30 * TotBV;
-    
-    % Setting state variable initial conditions 
-    %  Note that initial volume division is scaled as a fraction
-    %  of circulating blood volume calculated earlier and the 
-    %  initial guess of flow is total blood volume in one minute
-    
-    V_lv0 = (94.6812/1500) * CircBV;
-    V_rv0 = (90.7302/1500) * CircBV;
-    V_pa0 = (43.0123/1500) * CircBV;
-    V_pu0 = (808.458/1500) * CircBV;
-    V_ao0 = (133.338/1500) * CircBV;
-    V_vc0 = (329.780/1500) * CircBV;
-    Q_mt0 = TotBV/60;
-    Q_av0 = TotBV/60;
-    Q_tc0 = TotBV/60;
-    Q_pv0 = TotBV/60;
-
-    if (SmithParam_Flag == 1)
-        % Calculating the initial condition on the volume due to the septum 
-        %  deflection which is an implicit function requiring the use of fsolve
-        time = 0;
-        FSolve_Opts = optimset('Diagnostics','off', 'Display','off');
-        SeptZF_Hndl = @(V_spt) SeptZF(V_spt,V_lv0,V_rv0,time,CVParam_Struct);
-        [V_spt0,SeptZF_Val,ExitFlag,OutData] = fsolve(SeptZF_Hndl,-15, FSolve_Opts);
+    if (SmithParam_Flag == 1)                       % Smith et al. simulation
+        
+        % RUN SMITH ET AL. SIMULATION
+        % Calculate total blood volume based on height, weight and sex. 
+        %  This expression is from Nadler et al. Surgery 51:224,1962.
+        if (Sex == 'M')
+            TotBV = ((0.3669 * (Hgt/100)^3) + ...
+                (0.03219 * BW) + 0.6041) * 1000;
+        else
+            TotBV = ((0.3561 * (Hgt/100)^3) + ...
+                (0.03308 * BW) + 0.1833) * 1000;
+        end
+        % The original Smith model only circulated a portion of the blood so aortic
+        %  pressure dynamics are not lumped into a general arterila systemic 
+        %  compartment. Assuming they were simulating a typical 5000 mL total blood 
+        %  volume they included only 1500 mL (or 30%) in the circulating volume
+        %  therefore we will multiply our calculated TotBV value by 0.3 to yield 
+        %  circulating blood volume. To account for extra recruited volume in heart
+        %  disease the 30% circulating blood volume can be altered by changing SVFact
+        SVFact = 1.00;                              % Smith Value of SVFact
+        CircBV = SVFact * 0.30 * TotBV;
+        % Setting state variable initial conditions 
+        %  Note that initial volume division is scaled as a fraction
+        %  of circulating blood volume calculated earlier and the 
+        %  initial guess of flow is total blood volume in one minute
+        V_lv0 = (94.6812/1500) * CircBV;
+        V_rv0 = (90.7302/1500) * CircBV;
+        V_pa0 = (43.0123/1500) * CircBV;
+        V_pu0 = (808.458/1500) * CircBV;
+        V_ao0 = (133.338/1500) * CircBV;
+        V_vc0 = (329.780/1500) * CircBV;
+        Q_mt0 = TotBV/60;
+        Q_av0 = TotBV/60;
+        Q_tc0 = TotBV/60;
+        Q_pv0 = TotBV/60;
         % Put into vector to pass to ode15s
         X0(1) = V_lv0;
         X0(2) = V_rv0;
@@ -541,24 +594,96 @@
         X0(8) = Q_av0;
         X0(9) = Q_tc0;
         X0(10) = Q_pv0;
+        % Build driver function parameter structure
+        HR = HR_Smith;                              % RHC heart rate (beats/min)
+        period = 60/HR_Smith;                       % Period of heart beat (s)
+        B = HR_Smith;                               % Elastance fctn param (1/s^2)
+        C = period/2;                               % Elastance fctn param (s)
+        DriverP_Values = {HR period B C};
+        DriverP_Fields = {'HR' 'period' 'B' 'C'};
+        DriverP_Struct = cell2struct(DriverP_Values, ...
+            DriverP_Fields,2);
+        % Calculating the initial condition on the volume due to the septum 
+        %  deflection which is an implicit function requiring the use of fsolve
+        time = 0;
+        FSolve_Opts = optimset('Diagnostics','off','Display','off');
+        SeptZF_Hndl = @(V_spt) SeptZF(V_spt,V_lv0, ...
+            V_rv0,time,DriverP_Struct,CVParam_Struct);
+        [V_spt0,SeptZF_Val,ExitFlag,OutData] = ...
+            fsolve(SeptZF_Hndl,-15, FSolve_Opts);
+        % Put last initial condition into vector
         X0(11) = V_spt0;
-        
+        % Calculating timespans to reach steady state and then for simulation
+        TSpan_SS = [0 NumBeats_SS * period];
         % Build mass matrix for DAE solver
-        M = eye(11);                                    % Put identity on diagonal
-        M(11,11) = 0;                                   % Set last express as a ZFun
+        M = eye(11);                                % Put identity on diagonal
+        M(11,11) = 0;                               % Set last express as a ZFun
         % Set ODE/DAE options and time span
         ODE_Opts = odeset('Mass',M); 
-        TSpan = [0 4];
         % Solve over the time span with ode15s
-        [T_OutSS,X_OutSS] = ode15s(@dXdT_Smith, ...
-            TSpan_SS,X0,ODE_Opts,CVParam_Struct);
-        % Now solve over the simulation time span
-        [T_Out,X_Out] = ode15s(@dXdT_Smith, ...
-            TSpan_Sim,X_OutSS(end,:),ODE_Opts, ...
-            CVParam_Struct);
+        [T_Out_Smith,X_Out_Smith] = ode15s(@dXdT_Smith, ...
+            TSpan_SS,X0,ODE_Opts,DriverP_Struct,CVParam_Struct);
+        % Calculation intermediate pressures to plot
+        Num_TOut_Smith = size(T_Out_Smith,1); % Number of time points
+        P_LV_Smith = zeros(Num_TOut_Smith,1); % Preallocating matrices
+        P_RV_Smith = zeros(Num_TOut_Smith,1);
+        P_AO_Smith = zeros(Num_TOut_Smith,1);
+        P_VC_Smith = zeros(Num_TOut_Smith,1);
+        P_PA_Smith = zeros(Num_TOut_Smith,1);
+        P_PU_Smith = zeros(Num_TOut_Smith,1);
+        V_LVES_Smith = 1000;
+        V_LVED_Smith = 0;
+        % Running Smith model and loading intermediates for plotting
+        for i = 1:Num_TOut_Smith
+            VarOut = dXdT_Smith(T_Out_Smith(i), ...
+                X_Out_Smith(i,:),DriverP_Struct, ...
+                CVParam_Struct,1);
+            P_LV_Smith(i) = VarOut(1);
+            P_RV_Smith(i) = VarOut(2);
+            P_AO_Smith(i) = VarOut(3);
+            P_VC_Smith(i) = VarOut(4);
+            P_PA_Smith(i) = VarOut(5);
+            P_PU_Smith(i) = VarOut(6);
+            V_LVES_Smith = ...
+                min(V_LVES_Smith,X_Out_Smith(i,1));
+            V_LVED_Smith = ...
+                max(V_LVED_Smith,X_Out_Smith(i,1));
+        end
+        CO_Smith = ((V_LVED_Smith - ...
+            V_LVES_Smith) * HR_Smith) / 1000;
         
     else
         
+        % Calculate total blood volume based on height, weight and sex
+        %  which is the same for both RHC and Echo simulations
+        %  This expression is from Nadler et al. Surgery 51:224,1962.
+        if (Sex == 'M')
+            TotBV = ((0.3669 * (Hgt/100)^3) + ...
+                (0.03219 * BW) + 0.6041) * 1000;
+        else
+            TotBV = ((0.3561 * (Hgt/100)^3) + ...
+                (0.03308 * BW) + 0.1833) * 1000;
+        end
+        % The original Smith model only circulated a portion of the blood so aortic
+        %  pressure dynamics are not lumped into a general arterila systemic 
+        %  compartment. Assuming they were simulating a typical 5000 mL total blood 
+        %  volume they included only 1500 mL (or 30%) in the circulating volume
+        %  therefore we will multiply our calculated TotBV value by 0.3 to yield 
+        %  circulating blood volume. To account for extra recruited volume in heart
+        %  disease the 30% circulating blood volume can be altered by changing SVFact
+        SVFact = CVParam_Struct.SVFact;
+        CircBV = SVFact * 0.30 * TotBV;
+        % Setting state variable initial conditions 
+        %  Note that initial volume division is scaled as a fraction
+        %  of circulating blood volume calculated earlier and the 
+        %  initial guess of flow is total blood volume in one minute
+        V_lv0 = (94.6812/1500) * CircBV;
+        V_rv0 = (90.7302/1500) * CircBV;
+        V_pa0 = (43.0123/1500) * CircBV;
+        V_pu0 = (808.458/1500) * CircBV;
+        V_ao0 = (133.338/1500) * CircBV;
+        V_vc0 = (329.780/1500) * CircBV;
+        % Put into vector to pass to ode15s
         X0(1) = V_lv0;
         X0(2) = V_rv0;
         X0(3) = V_pa0;
@@ -566,423 +691,303 @@
         X0(5) = V_ao0;
         X0(6) = V_vc0;
         
-        % Solve over the time span with ode15s
-        [T_OutSS,X_OutSS] = ode15s(@dXdT_SmithRed4, ...
-            TSpan_SS,X0,[],CVParam_Struct);
-        % Now solve over the simulation time span
-        [T_Out,X_Out] = ode15s(@dXdT_SmithRed4, ...
-            TSpan_Sim,X_OutSS(end,:),[],CVParam_Struct);
+        if (RHCEcho_Flag == 1)                      % With RHC and Echo data
+            
+            % RUN RHC SIMULATION FIRST
+            % Build driver function parameter structure
+            HR = HR_RHC;                            % RHC heart rate (beats/min)
+            period = 60/HR_RHC;                     % Period of heart beat (s)
+            B = HR_RHC;                             % Elastance fctn param (1/s^2)
+            C = period/2;                           % Elastance fctn param (s)
+            DriverP_Values = {HR period B C};
+            DriverP_Fields = {'HR' 'period' 'B' 'C'};
+            DriverP_Struct = cell2struct(DriverP_Values, ...
+                DriverP_Fields,2);
+            % Calculating timespans to reach steady state and then for simulation
+            TSpan_SS = [0 NumBeats_SS * period];
+            
+            % Solve over the time span with ode15s
+            [T_Out_RHC,X_Out_RHC] = ode15s(@dXdT_SmithRed4, ...
+                TSpan_SS,X0,[],DriverP_Struct,CVParam_Struct);
+            
+            % CAPTURING INTERMEDIATE PRESSURES TO PLOT
+            Num_TOut_RHC = size(T_Out_RHC,1); % Number of time points
+            P_LV_RHC = zeros(Num_TOut_RHC,1); % Preallocating matrices
+            P_RV_RHC = zeros(Num_TOut_RHC,1);
+            P_AO_RHC = zeros(Num_TOut_RHC,1);
+            P_VC_RHC = zeros(Num_TOut_RHC,1);
+            P_PA_RHC = zeros(Num_TOut_RHC,1);
+            P_PU_RHC = zeros(Num_TOut_RHC,1);
+            % RERUNNING MODEL TO GET INTERMEDIATE PRESSURES
+            for i = 1:Num_TOut_RHC
+                VarOut = dXdT_SmithRed4(T_Out_RHC(i), ...
+                    X_Out_RHC(i,:),DriverP_Struct, ...
+                    CVParam_Struct,1);
+                P_LV_RHC(i) = VarOut(1);
+                P_RV_RHC(i) = VarOut(2);
+                P_AO_RHC(i) = VarOut(3);
+                P_VC_RHC(i) = VarOut(4);
+                P_PA_RHC(i) = VarOut(5);
+                P_PU_RHC(i) = VarOut(6);
+            end
+            
+            % RUN ECHO SIMULATION NEXT
+            % Build driver function parameter structure
+            HR = HR_Echo;                           % RHC heart rate (beats/min)
+            period = 60/HR_Echo;                    % Period of heart beat (s)
+            B = HR_Echo;                            % Elastance fctn param (1/s^2)
+            C = period/2;                           % Elastance fctn param (s)
+            DriverP_Values = {HR period B C};
+            DriverP_Fields = {'HR' 'period' 'B' 'C'};
+            DriverP_Struct = cell2struct(DriverP_Values, ...
+                DriverP_Fields,2);
+            % Solve over the time span with ode15s
+            [T_Out_Echo,X_Out_Echo] = ode15s(@dXdT_SmithRed4, ...
+                TSpan_SS,X0,[],DriverP_Struct,CVParam_Struct);
+            % CAPTURING THE LEFT AND RIGHT VENTRICULAR PRESSURES
+            Num_TOut_Echo = ...                     % Number of time points
+                size(T_Out_Echo,1);
+            P_LV_Echo = zeros(Num_TOut_Echo,1);     % Preallocating matrices
+            P_RV_Echo = zeros(Num_TOut_Echo,1);
+            % RERUNNING THE SIMULATION TO EXTRACT THE PRESSURES
+            for i = 1:Num_TOut_Echo
+                VarOut = dXdT_SmithRed4(T_Out_Echo(i), ...
+                    X_Out_Echo(i,:),DriverP_Struct, ...
+                    CVParam_Struct,1);
+                P_LV_Echo(i) = VarOut(1);
+                P_RV_Echo(i) = VarOut(2);
+            end
+            
+            % GETTING THE RESIDUAL AT THE OPTIM PARAMETER VALUES
+            if (HandTune_Flag == 0 && OptimBest_Flag == 0 && SmithParam_Flag == 0)
+                Res_Optim = PatSpecHFRed4_ObjFun(p_Optim,AllStruct_Struct);
+            end
+            
+        else                                        % RHC data only
+            
+            % RUN RHC SIMULATION ONLY
+            % Build driver function parameter structure
+            HR = HR_RHC;                            % RHC heart rate (beats/min)
+            period = 60/HR_RHC;                     % Period of heart beat (s)
+            B = HR_RHC;                             % Elastance fctn param (1/s^2)
+            C = period/2;                           % Elastance fctn param (s)
+            DriverP_Values = {HR period B C};
+            DriverP_Fields = {'HR' 'period' 'B' 'C'};
+            DriverP_Struct = cell2struct(DriverP_Values, ...
+                DriverP_Fields,2);
+            %Calculating timespans to reach steady state and then for simulation
+            TSpan_SS = [0 NumBeats_SS * period];
+            
+            % Solve over the time span with ode15s
+            [T_Out_RHC,X_Out_RHC] = ode15s(@dXdT_SmithRed4, ...
+                TSpan_SS,X0,[],DriverP_Struct,CVParam_Struct);
+            
+            % CAPTURING INTERMEDIATE PRESSURES TO PLOT
+            Num_TOut_RHC = size(T_Out_RHC,1); % Number of time points
+            P_LV_RHC = zeros(Num_TOut_RHC,1); % Preallocating matrices
+            P_RV_RHC = zeros(Num_TOut_RHC,1);
+            P_AO_RHC = zeros(Num_TOut_RHC,1);
+            P_VC_RHC = zeros(Num_TOut_RHC,1);
+            P_PA_RHC = zeros(Num_TOut_RHC,1);
+            P_PU_RHC = zeros(Num_TOut_RHC,1);
+            % RERUNNING MODEL TO GET INTERMEDIATE PRESSURES
+            for i = 1:Num_TOut_RHC
+                VarOut = dXdT_SmithRed4(T_Out_RHC(i), ...
+                    X_Out_RHC(i,:),DriverP_Struct, ...
+                    CVParam_Struct,1);
+                P_LV_RHC(i) = VarOut(1);
+                P_RV_RHC(i) = VarOut(2);
+                P_AO_RHC(i) = VarOut(3);
+                P_VC_RHC(i) = VarOut(4);
+                P_PA_RHC(i) = VarOut(5);
+                P_PU_RHC(i) = VarOut(6);
+            end
+        
+            % GETTING THE RESIDUAL AT THE OPTIM PARAMETER VALUES
+            if (HandTune_Flag == 0 && OptimBest_Flag == 0 && SmithParam_Flag == 0)
+                Res_Optim = PatSpecHFRed4_ObjFun(p_Optim,AllStruct_Struct);
+            end
+            
+        end
         
     end
     
-    
+
 %% **********************************************************************************
 %  Plot Sim or Opt of   S M I T H   C A R D I O V A S C   M O D E L   S I M / O P T
 % ***********************************************************************************
 
-    % PLOT SOLUTION AND DATA
-    %  In the case that we are not hand tuning we want to plot out the
-    %  full final figure with data. If we are just plotting out a solution 
-    %  Smith model results we can plot either with or without data
-        
-    % CALCULATING INTERMEDIATE PRESSURES TO PLOT
-    Num_TOut = size(T_Out,1);                       % Number of time points
-    P_LVSim = zeros(Num_TOut,1);                       % Preallocating matrices
-    P_RVSim = zeros(Num_TOut,1);
-    P_AOSim = zeros(Num_TOut,1);
-    P_VCSim = zeros(Num_TOut,1);
-    P_PASim = zeros(Num_TOut,1);
-    P_PUSim = zeros(Num_TOut,1);
-    V_LVESSim = 1000;
-    V_LVEDSim = 0;
-    % RUNNING MODEL TO GET INTERMEDIATES
+    % PLOT SMITH SIMULATION OR OPTIM/HAND TUNE WITH RHC/ECHO OR RHC ONLY DATA
+    %  If we are just simulating the Smith et al. result then no data is 
+    %  plotted and we run one simulation. If we have optimization results or 
+    %  are performing a hand tune we plot out the simulation with a RHC simulation
+    %  and an Echo simulation when both datasets are present and only a RHC
+    %  simulation if only RHC data is present.
+    
     if (SmithParam_Flag == 1)
         
-        for i = 1:Num_TOut
-            VarOut = dXdT_Smith(T_Out(i),X_Out(i,:),CVParam_Struct,1);
-            P_LVSim(i) = VarOut(1);
-            P_RVSim(i) = VarOut(2);
-            P_AOSim(i) = VarOut(3);
-            P_VCSim(i) = VarOut(4);
-            P_PASim(i) = VarOut(5);
-            P_PUSim(i) = VarOut(6);
-            V_LVESSim = min(V_LVESSim,X_Out(i,1));
-            V_LVEDSim = max(V_LVEDSim,X_Out(i,1));
+        NumBeat_Start = NumBeats_SS - NumBeats_ResPlot;
+        tStart_Ind = ...
+            find(T_Out_Smith >= (NumBeat_Start * period),1,'first');
+        tStart = T_Out_Smith(tStart_Ind);
+        T_Out = T_Out_Smith(tStart_Ind:end) - tStart;
+        P_RVSim = P_RV_Smith(tStart_Ind:end);
+        P_AOSim = P_AO_Smith(tStart_Ind:end);
+        P_PASim = P_PA_Smith(tStart_Ind:end);
+        P_PUSim = P_PU_Smith(tStart_Ind:end);
+        CO_Sim = CO_Smith;
+        V_LVSim = X_Out_Smith(tStart_Ind:end,1);
+        V_RVSim = X_Out_Smith(tStart_Ind:end,2);
+        P_LVSim = P_LV_Smith(tStart_Ind:end);
+        P_VCSim = P_VC_Smith(tStart_Ind:end);
+        
+        SimPlot_Values = {T_Out P_RVSim P_AOSim P_PASim ...
+            P_PUSim CO_Sim V_LVSim V_RVSim P_LVSim P_VCSim};
+        SimPlot_Fields = {'T_Out' 'P_RVSim' 'P_AOSim' 'P_PASim' ...
+            'P_PUSim' 'CO_Sim' 'V_LVSim' 'V_RVSim' 'P_LVSim' 'P_VCSim'};
+        SimPlot_Struct = cell2struct(SimPlot_Values, ...
+            SimPlot_Fields,2);
+     
+        SixPanel_Figure(AllStruct_Struct,SimPlot_Struct)
+
+        if (SaveSmith_Flag == 1)
+
+            T_SimSmith = T_Out;
+            P_RVSimSmith = P_RVSim;
+            P_AOSimSmith = P_AOSim;
+            P_PASimSmith = P_PASim;
+            P_PUSimSmith = P_PUSim;
+            CO_SimSmith = CO_Sim;
+            P_LVSimSmith = P_LVSim;
+            P_VCSimSmith = P_VCSim;
+            V_LVSimSmith = V_LVSim;
+            V_RVSimSmith = V_RVSim;
+
+            SaveFile1 = 'SmithVars.mat';
+            save(SaveFile1, 'T_SimSmith', 'P_RVSimSmith', ...
+                'P_AOSimSmith', 'P_PASimSmith', 'P_PUSimSmith', ...
+                'CO_SimSmith', 'P_LVSimSmith', 'P_VCSimSmith',...
+                'V_LVSimSmith', 'V_RVSimSmith')
+
         end
         
     else
         
-        for i = 1:Num_TOut
-            VarOut = dXdT_SmithRed4(T_Out(i),X_Out(i,:),CVParam_Struct,1);
-            P_LVSim(i) = VarOut(1);
-            P_RVSim(i) = VarOut(2);
-            P_AOSim(i) = VarOut(3);
-            P_VCSim(i) = VarOut(4);
-            P_PASim(i) = VarOut(5);
-            P_PUSim(i) = VarOut(6);
-            V_LVESSim = min(V_LVESSim,X_Out(i,1));
-            V_LVEDSim = max(V_LVEDSim,X_Out(i,1));
-        end
+        if (RHCEcho_Flag == 1)
+            
+            NumBeat_Start = NumBeats_SS - NumBeats_ResPlot;
+            tStartRHC_Ind = ...
+                find(T_Out_RHC >= (NumBeat_Start * period),1,'first');
+            tStartRHC = T_Out_RHC(tStartRHC_Ind);
+            tStartEcho_Ind = ...
+                find(T_Out_Echo >= (NumBeat_Start * period),1,'first');
+            tStartEcho = T_Out_Echo(tStartEcho_Ind);
+            T_OutRHC = T_Out_RHC(tStartRHC_Ind:end) - tStartRHC;
+            T_OutEcho = T_Out_Echo(tStartEcho_Ind:end) - tStartEcho;
+            P_RVRHCSim = P_RV_RHC(tStartRHC_Ind:end);
+            P_RVEchoSim = P_RV_Echo(tStartEcho_Ind:end);
+            P_AOSim = P_AO_RHC(tStartRHC_Ind:end);
+            P_PASim = P_PA_RHC(tStartRHC_Ind:end);
+            P_PUSim = P_PU_RHC(tStartRHC_Ind:end);
+            V_LVRHCSim = X_Out_RHC(tStartRHC_Ind:end,1);
+            V_RVRHCSim = X_Out_RHC(tStartRHC_Ind:end,2);
+            V_LVED_RHC = max(V_LVRHCSim);
+            V_LVES_RHC = min(V_LVRHCSim);    
+            CO_RHCSim = ((V_LVED_RHC - V_LVES_RHC) * HR_RHC) / 1000;
+            V_LVEchoSim = X_Out_Echo(tStartEcho_Ind:end,1);
+            V_RVEchoSim = X_Out_Echo(tStartEcho_Ind:end,2);
+            V_LVED_Echo = max(V_LVEchoSim);
+            V_LVES_Echo = min(V_LVEchoSim); 
+            CO_EchoSim = ((V_LVED_Echo - V_LVES_Echo) * HR_Echo) / 1000;
+            P_LVRHCSim = P_LV_RHC(tStartRHC_Ind:end);
+            P_LVEchoSim = P_LV_Echo(tStartEcho_Ind:end);
+            P_VCSim = P_VC_RHC(tStartRHC_Ind:end);
         
-    end
-        
-    CO_Sim = ((V_LVEDSim - V_LVESSim) * Ave_HR) / 1000;
-    if (HandTune_Flag == 0 && OptimBest_Flag == 0 && SmithParam_Flag == 0)
-        Res_Optim = Smith_ObjFun(p_Optim,PatData_Struct, ...
-            CVParam_Struct,SimOptParam_Struct);
-    end
-    
-    % NOW GENERATE THE FIGURE 
-    
-    % Load previous Smith param model run if we are comparing runs
-    if (Comp2Smith_Flag == 1)
-        load SmithVars.mat
-    end
-   
-    % Plot figure to check how close simulation 
-    %  is to data or just simulation alone
-    ScrSize = get(0,'ScreenSize');              % Getting screen size
-    
-    SixP_Fig = figure('Position', ...           % Positioning the figure
-        [ScrSize(3)/50 ScrSize(4)/50 ...        %  on the screen
-        ScrSize(3)/1.05 ScrSize(4)/1.05]); 
-    
-    if (SmithParam_Flag == 1)
-        SupT_Hndl = suptitle({'Smith Params Normal'});
-    elseif (Comp2Smith_Flag == 1)
-        SupT_Hndl = suptitle({'Comparison to Smith Params'});
-    else
-        SupT_Hndl = suptitle({['D ID Number ' DID_Num]});
-    end
-    set(SupT_Hndl,'FontSize',24,'FontWeight','bold')
-    
-    % Subplot that compares measured and simulated pressures if data used
-    subplot(2,3,1)
-        plot(T_Out,P_RVSim,'-g', ...            % P_RV simulation
-            'LineWidth',3, ...
-            'DisplayName','P_{RV}')
-        hold on
-        if (Comp2Smith_Flag == 1)
-            SmithP1 = plot(T_SimSmith, ...
-                P_RVSimSmith,'--g', ...
-                'LineWidth',3, ...
-                'HandleVisibility','off');
-            SmithP1.Color(4) = 0.25;
-        end
-        if (SmithParam_Flag == 0)
-            plot([T_Out(1),T_Out(end)], ...     % P_RV systole data
-                [P_RVsyst,P_RVsyst],'-.g', ...
-                'LineWidth',1.5, ...
-                'HandleVisibility','off')
-            plot([T_Out(1),T_Out(end)], ...     % P_RV diastole data
-                [P_RVdiast,P_RVdiast],':g', ...
-                'LineWidth',1.5, ...
-                'HandleVisibility','off')
-        end
-        plot(T_Out,P_AOSim,'-r', ...            % P_AO simulation
-            'LineWidth',3, ...
-            'DisplayName','P_{AO}')
-        if (Comp2Smith_Flag == 1)
-            SmithP2 = plot(T_SimSmith, ...
-                P_AOSimSmith,'--r', ...
-                'LineWidth',3, ...
-                'HandleVisibility','off');
-            SmithP2.Color(4) = 0.25;
-        end
-        if (SmithParam_Flag == 0)
-            plot([T_Out(1),T_Out(end)], ...     % P_AO systole data
-                [P_AOsyst,P_AOsyst],'-.r', ...
-                'LineWidth',1.5, ...
-                'HandleVisibility','off')
-            plot([T_Out(1),T_Out(end)], ...     % P_AO diastole data
-                [P_AOdiast,P_AOdiast],':r', ...
-                'LineWidth',1.5, ...
-                'HandleVisibility','off')
-        end
-        plot(T_Out,P_PASim,'-b', ...            % P_PA simulation
-            'LineWidth',3, ...
-            'DisplayName','P_{PA}')
-        if (Comp2Smith_Flag == 1)
-            SmithP3 = plot(T_SimSmith, ...
-                P_PASimSmith,'--b', ...
-                'LineWidth',3, ...
-                'HandleVisibility','off');
-            SmithP3.Color(4) = 0.25;
-        end
-        if (SmithParam_Flag == 0)
-            plot([T_Out(1),T_Out(end)], ...     % P_PA systole data
-                [P_PAsyst,P_PAsyst],'-.b', ...
-                'LineWidth',1.5, ...
-                'HandleVisibility','off')
-            plot([T_Out(1),T_Out(end)], ...     % P_PA diastole data
-                [P_PAdiast,P_PAdiast],':b', ...
-                'LineWidth',1.5, ...
-                'HandleVisibility','off')
-        end
-        plot(T_Out,P_PUSim,'-c', ...            % P_PU simulation
-            'LineWidth',3, ...
-            'DisplayName','P_{PU}')
-        if (Comp2Smith_Flag == 1)
-            SmithP4 = plot(T_SimSmith, ...
-                P_PUSimSmith,'--c', ...
-                'LineWidth',3, ...
-                'HandleVisibility','off');
-            SmithP4.Color(4) = 0.25;
-        end
-        if (SmithParam_Flag == 0)
-            plot([T_Out(1),T_Out(end)], ...     % P_PCW average data
-                [P_PCWave,P_PCWave],'-.c', ...
-                'LineWidth',1.5, ...
-                'HandleVisibility','off')
-        end
-        if (SmithParam_Flag == 0)
-            PMax_SP1 = 1.45 * ...
-                max(P_AOsyst,max(P_AOSim));
-            text(0.5,0.95*PMax_SP1, ...         % CO data
-                ['CO Data = ' num2str(CO_Thermo)])
-            text(0.5,0.90*PMax_SP1, ...
-                ['CO Sim  = ' num2str(CO_Sim)]) % CO simulation
-        elseif (Comp2Smith_Flag == 1)
-            PMax_SP1 = 1.45 * ...
-                max([max(P_AOSim) max(P_AOSimSmith)]);
-            text(0.5,0.95*PMax_SP1, ...         % CO Smith params
-                ['CO Smith = ' num2str(CO_SimSmith)])
-            text(0.5,0.90*PMax_SP1, ...
-                ['CO Sim  = ' num2str(CO_Sim)]) % CO simulation
+            SimPlot_Values = {T_OutRHC T_OutEcho P_RVRHCSim ...
+                P_RVEchoSim P_AOSim P_PASim P_PUSim CO_RHCSim ...
+                CO_EchoSim V_LVEchoSim V_RVEchoSim P_LVRHCSim ...
+                P_LVEchoSim P_VCSim};
+            SimPlot_Fields = {'T_OutRHC' 'T_OutEcho' 'P_RVRHCSim' ...
+                'P_RVEchoSim' 'P_AOSim' 'P_PASim' 'P_PUSim' ...
+                'CO_RHCSim' 'CO_EchoSim' 'V_LVEchoSim' 'V_RVEchoSim' ...
+                'P_LVRHCSim' 'P_LVEchoSim' 'P_VCSim'};
+            SimPlot_Struct = cell2struct(SimPlot_Values, ...
+                SimPlot_Fields,2);
+     
+            SixPanel_Figure(AllStruct_Struct,SimPlot_Struct)
+            
+            % CHECK TO MAKE SURE WE HAVE REACHED STEADY STATE
+            % GET VOLUMES TO PLOT
+            V_RVED_Echo = max(V_RVEchoSim);
+            V_RVES_Echo = min(V_RVEchoSim); 
+            CO_RVEchoSim = ((V_RVED_Echo - V_RVES_Echo) * HR_Echo) / 1000;
+            VTotEcho = X_Out_Echo(tStartEcho_Ind:end,1) + ...
+                X_Out_Echo(tStartEcho_Ind:end,2) + ...
+                X_Out_Echo(tStartEcho_Ind:end,3) + ...
+                X_Out_Echo(tStartEcho_Ind:end,4) + ...
+                X_Out_Echo(tStartEcho_Ind:end,5) + ...
+                X_Out_Echo(tStartEcho_Ind:end,6); 
+            VTotRHC = X_Out_RHC(tStartRHC_Ind:end,1) + ...
+                X_Out_RHC(tStartRHC_Ind:end,2) + ...
+                X_Out_RHC(tStartRHC_Ind:end,3) + ...
+                X_Out_RHC(tStartRHC_Ind:end,4) + ...
+                X_Out_RHC(tStartRHC_Ind:end,5) + ...
+                X_Out_RHC(tStartRHC_Ind:end,6); 
+            % PLOT ALL IN ONE FIGURE
+            ScrSize = get(0,'ScreenSize');              % Getting screen size
+            VolCheck_Fig = figure('Position', ...       % Positioning the figure
+                [ScrSize(3)/50 ScrSize(4)/50 ...        %  on the screen
+                ScrSize(3)/2 ScrSize(4)/2]); 
+            plot(T_OutRHC,VTotRHC,'-b','LineWidth',3)
+            hold on
+            plot(T_OutEcho,VTotEcho,':k','LineWidth',3)
+            plot(T_OutEcho,X_Out_Echo(tStartEcho_Ind:end,1),'--r','LineWidth',3)
+            plot(T_OutEcho,X_Out_Echo(tStartEcho_Ind:end,2),'--g','LineWidth',3)
+            plot(T_OutEcho,X_Out_Echo(tStartEcho_Ind:end,3),'--b','LineWidth',3)
+            plot(T_OutEcho,X_Out_Echo(tStartEcho_Ind:end,4),':r','LineWidth',3)
+            plot(T_OutEcho,X_Out_Echo(tStartEcho_Ind:end,5),':g','LineWidth',3)
+            plot(T_OutEcho,X_Out_Echo(tStartEcho_Ind:end,6),':b','LineWidth',3)
+            hold off
+            legend('V_{Tot,RHC}','V_{Tot,Echo}','V_{LV,Echo}', ...
+                'V_{RV,Echo}', 'V_{PA,Echo}', 'V_{PU,Echo}', ...
+                'V_{AO,Echo}', 'V_{VC,Echo}')
+            xlabel('Time, s','FontSize',14,'FontWeight','bold')
+            ylabel('Volume, mL','FontSize',14,'FontWeight','bold')
+            
+            
         else
-            PMax_SP1 = 1.45 * max(P_AOSim);
-            text(0.5,0.90*PMax_SP1, ...
-                ['CO Sim  = ' num2str(CO_Sim)]) % CO simulation
-        end
-        xlim([0 5])                             % Formatting subplot
-        ylim([-20 PMax_SP1])
-        LegHndl1 = legend('show');
-        set(LegHndl1,'Box','off','FontSize',8)
-        set(gca,'FontSize',14,'FontWeight', ...
-            'bold','Box','off')
-        xlabel('Time (sec)','FontSize',20, ...
-            'FontWeight','bold')
-        ylabel('Pressures (mmHg)', ...
-            'FontSize',20,'FontWeight','bold')
-    
-    % Subplot that shows simulated left and right ventricular volumes    
-    subplot(2,3,2)
-        plot(T_Out,X_Out(:,1),'-k', ...         % V_LV simulation    
-            'LineWidth',3)
-        hold on
-        if (Comp2Smith_Flag == 1)
-            SmithP5 = plot(T_SimSmith, ...
-                V_LVSimSmith,'--k', ...
-                'LineWidth',3, ...
-                'HandleVisibility','off');
-            SmithP5.Color(4) = 0.25;
-        end
-        plot(T_Out,X_Out(:,2),'-g', ...         % V_RV simulation 
-            'LineWidth',3)
-        if (Comp2Smith_Flag == 1)
-            SmithP6 = plot(T_SimSmith, ...
-                V_RVSimSmith,'--g', ...
-                'LineWidth',3, ...
-                'HandleVisibility','off');
-            SmithP6.Color(4) = 0.25;
-        end
-        if (Comp2Smith_Flag == 1)
-            VMax_SP2 = 1.20*max([max(X_Out(:,1)) ...
-                max(X_Out(:,2)) ...
-                max(V_LVSimSmith(:,1))]);
-            VMin_SP2 = 0.85*min([min(X_Out(:,1)) ...
-                min(X_Out(:,2)) ...
-                min(V_LVSimSmith(:,1))]);
-        else
-            VMax_SP2 = 1.20*max(max(X_Out(:,1)), ...
-                max(X_Out(:,2)));
-            VMin_SP2 = 0.85*min(min(X_Out(:,1)), ...
-                min(X_Out(:,2)));
-        end
-        xlim([0 5])                             % Formatting subplot
-        ylim([VMin_SP2 VMax_SP2])
-        LegHndl2 = legend('V_{LV}','V_{RV}');  
-        set(LegHndl2,'Box','off','FontSize',8)
-        set(gca,'FontSize',14, ...
-            'FontWeight','bold','Box','off')
-        xlabel('Time (sec)','FontSize',20, ...
-            'FontWeight','bold')
-        ylabel('Ventricular Volume (mL)', ...
-            'FontSize',20,'FontWeight','bold')
+            
+            NumBeat_Start = NumBeats_SS - NumBeats_ResPlot;
+            tStartRHC_Ind = ...
+                find(T_Out_RHC >= (NumBeat_Start * period),1,'first');
+            T_Out = T_Out_RHC(tStartRHC_Ind:end);
+            P_RVSim = P_RV_RHC(tStartRHC_Ind:end);
+            P_AOSim = P_AO_RHC(tStartRHC_Ind:end);
+            P_PASim = P_PA_RHC(tStartRHC_Ind:end);
+            P_PUSim = P_PU_RHC(tStartRHC_Ind:end);
+            V_LVSim = X_Out_RHC(tStartRHC_Ind:end,1);
+            V_RVSim = X_Out_RHC(tStartRHC_Ind:end,2);
+            P_LVSim = P_LV_RHC(tStartRHC_Ind:end);
+            P_VCSim = P_VC_RHC(tStartRHC_Ind:end);
         
-    % Subplot that shows simulated left ventricular,
-    %  aortic and pulmonary vein pressures
-    subplot(2,3,4)
-        plot(T_Out,P_LVSim,'-k','LineWidth',3)  % P_LV simulation
-        hold on
-        if (Comp2Smith_Flag == 1)
-            SmithP7 = plot(T_SimSmith, ...
-                P_LVSimSmith,'--k', ...
-                'LineWidth',3, ...
-                'HandleVisibility','off');
-            SmithP7.Color(4) = 0.25;
+            SimPlot_Values = {T_Out P_RVSim P_AOSim P_PASim ...
+                P_PUSim CO_RHCSim V_LVSim V_RVSim P_LVSim P_VCSim};
+            SimPlot_Fields = {'T_Out' 'P_RVSim' 'P_AOSim' 'P_PASim' ...
+                'P_PUSim' 'CO_RHCSim' 'V_LVSim' 'V_RVSim' ...
+                'P_LVSim' 'P_VCSim'};
+            SimPlot_Struct = cell2struct(SimPlot_Values, ...
+                SimPlot_Fields,2);
+     
+            SixPanel_Figure(AllStruct_Struct,SimPlot_Struct)
+            
         end
-        plot(T_Out,P_AOSim,'-r','LineWidth',3)  % P_AO simulation
-        if (Comp2Smith_Flag == 1)
-            SmithP8 = plot(T_SimSmith, ...
-                P_AOSimSmith,'--r', ...
-                'LineWidth',3, ...
-                'HandleVisibility','off');
-            SmithP8.Color(4) = 0.25;
-        end
-        plot(T_Out,P_PUSim,'-c','LineWidth',3)  % P_PU simulation
-        if (Comp2Smith_Flag == 1)
-            SmithP9 = plot(T_SimSmith, ...
-                P_PUSimSmith,'--c', ...
-                'LineWidth',3, ...
-                'HandleVisibility','off');
-            SmithP9.Color(4) = 0.25;
-        end
-        PMax_SP4 = 1.30*max(max(P_LVSim), ...
-            max(P_AOSim));
-        xlim([0 5])                             % Formatting subplot
-        ylim([-10 PMax_SP4])
-        LegHndl4 = legend('P_{LV}', ...
-            'P_{AO}','P_{PU}');
-        set(LegHndl4,'Box','off','FontSize',8)
-        set(gca,'FontSize',14, ...
-            'FontWeight','bold','Box','off')
-        xlabel('Time (sec)','FontSize',20, ...
-            'FontWeight','bold')
-        ylabel('Pressure (mmHg)', ...
-            'FontSize',20,'FontWeight','bold')
-    
-    % Subplot that shows simulated right ventricular,
-    %  pulmonary artery and vena cava pressures    
-    subplot(2,3,5)
-        plot(T_Out,P_RVSim,'-g','LineWidth',3)  % P_RV simulation
-        hold on
-        if (Comp2Smith_Flag == 1)
-            SmithP10 = plot(T_SimSmith, ...
-                P_RVSimSmith,'--g', ...
-                'LineWidth',3, ...
-                'HandleVisibility','off');
-            SmithP10.Color(4) = 0.25;
-        end
-        plot(T_Out,P_PASim,'-b','LineWidth',3)  % P_PA simulation
-        if (Comp2Smith_Flag == 1)
-            SmithP11 = plot(T_SimSmith, ...
-                P_PASimSmith,'--b', ...
-                'LineWidth',3, ...
-                'HandleVisibility','off');
-            SmithP11.Color(4) = 0.25;
-        end
-        plot(T_Out,P_VCSim,'-m','LineWidth',3)  % P_VC simulation
-        if (Comp2Smith_Flag == 1)
-            SmithP12 = plot(T_SimSmith, ...
-                P_VCSimSmith,'--m', ...
-                'LineWidth',3, ...
-                'HandleVisibility','off');
-            SmithP12.Color(4) = 0.25;
-        end
-        PMax_SP5 = 1.30*max(max(P_RVSim), ...
-            max(P_PASim));
-        xlim([0 5])                             % Formatting subplot
-        ylim([-5 PMax_SP5])
-        LegHndl5 = legend('P_{RV}', ...
-            'P_{PA}','P_{VC}');
-        set(LegHndl5,'Box','off','FontSize',8)
-        set(gca,'FontSize',14, ...
-            'FontWeight','bold','Box','off')
-        xlabel('Time (sec)','FontSize',20, ...
-            'FontWeight','bold')
-        ylabel('Pressure (mmHg)', ...
-            'FontSize',20,'FontWeight','bold')
-        
-    % Subplot that shows simulated left and right ventricular pressure volume loops
-    subplot(2,3,[3 6]) 
-        LVVol_Max = max(X_Out(:,1));
-        RVVol_Max = max(X_Out(:,2));
-        if (SmithParam_Flag == 0)
-            if (Comp2Smith_Flag == 1)
-                LVVol_SmithMax = max(V_LVSimSmith);
-                VMax_SP36 = max([LVVol_Max RVVol_Max ...
-                    V_LVdiast LVVol_SmithMax]);
-            else
-                VMax_SP36 = max([LVVol_Max RVVol_Max V_LVdiast]);
-            end
-        else
-            if (Comp2Smith_Flag == 1)
-                LVVol_SmithMax = max(V_LVSimSmith);
-                VMax_SP36 = max([LVVol_Max RVVol_Max LVVol_SmithMax]);
-            else
-                VMax_SP36 = max([LVVol_Max RVVol_Max]);
-            end
-        end
-        if (Comp2Smith_Flag == 1)
-            P_LVSmithMax = max(P_LVSimSmith);
-            PMax_SP36 = max([max(P_LVSim) max(P_RVSim) P_LVSmithMax]);
-        else
-            PMax_SP36 = max(max(P_LVSim),max(P_RVSim));
-        end
-        PMin_SP36 = -10;
-        plot(X_Out(:,1),P_LVSim,'-k', ...       % V_LV vs P_LV simulation
-            'LineWidth',3)
-        hold on
-        if (Comp2Smith_Flag == 1)
-            SmithP13 = plot(V_LVSimSmith, ...
-                P_LVSimSmith,'--k', ...
-                'LineWidth',3, ...
-                'HandleVisibility','off');
-            SmithP13.Color(4) = 0.15;
-        end
-        plot(X_Out(:,2),P_RVSim,'-g', ...       % V_RV vs P_RV simulation
-            'LineWidth',3)
-        if (Comp2Smith_Flag == 1)
-            SmithP14 = plot(V_RVSimSmith, ...
-                P_RVSimSmith,'--g', ...
-                'LineWidth',3, ...
-                'HandleVisibility','off');
-            SmithP14.Color(4) = 0.15;
-        end
-        if ((SmithParam_Flag == 0) && (RHCEcho_Flag == 1))
-            plot([V_LVsyst V_LVsyst], ...
-                [0.5*PMin_SP36 1.05*PMax_SP36], ...
-                '-.k','LineWidth',1.5)
-            plot([V_LVdiast V_LVdiast], ...
-                [0.5*PMin_SP36 1.05*PMax_SP36], ...
-                ':k','LineWidth',1.5)
-        end
-        xlim([0 VMax_SP36*1.20])                % Formatting subplot
-        ylim([PMin_SP36 1.15*PMax_SP36])
-        LegHndl36 = legend('LV','RV');
-        set(LegHndl36,'Box','off','FontSize',8)
-        set(gca,'FontSize',14, ...
-            'FontWeight','bold','Box','off')
-        xlabel('LV Volume (mL)', ...
-            'FontSize',20,'FontWeight','bold')
-        ylabel('LV Pressure (mmHg)', ...
-            'FontSize',20,'FontWeight','bold')
-        
-    if (SaveSmith_Flag == 1)
-        
-        T_SimSmith = T_Out;
-        P_RVSimSmith = P_RVSim;
-        P_AOSimSmith = P_AOSim;
-        P_PASimSmith = P_PASim;
-        P_PUSimSmith = P_PUSim;
-        CO_SimSmith = CO_Sim;
-        P_LVSimSmith = P_LVSim;
-        P_VCSimSmith = P_VCSim;
-        V_LVSimSmith = X_Out(:,1);
-        V_RVSimSmith = X_Out(:,2);
-        
-        SaveFile1 = 'SmithVars.mat';
-        save(SaveFile1, 'T_SimSmith', 'P_RVSimSmith', ...
-            'P_AOSimSmith', 'P_PASimSmith', 'P_PUSimSmith', ...
-            'CO_SimSmith', 'P_LVSimSmith', 'P_VCSimSmith',...
-            'V_LVSimSmith', 'V_RVSimSmith')
         
     end
+        
     if (HandTune_Flag == 0 && SmithParam_Flag == 0 && OptimBest_Flag == 0)
         Expp_Optim = exp(p_Optim);
         SaveFile2 = 'OptimParams.mat';
         save(SaveFile2,'Expp_Optim','AdjParam_Strngs','Res_Optim')
     end
-    
+
     toc

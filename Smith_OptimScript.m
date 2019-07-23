@@ -15,8 +15,8 @@
 %   when ode15s is called it loads a singular mass matrix M with ones along the 
 %   diagonal except for a zero in the position of the implicit expression. 
 %
-%   Model originally created on     17  January 2016
-%   Model last modfied on           14 February 2019
+%   Model originally created on     17 January 2016
+%   Model last modfied on           16    July 2019
 
 %   Developed by        Brian Carlson
 %                       Physiological Systems Dynamics Laboratory
@@ -34,35 +34,37 @@
     tic
     warning('off','all');
     
-    DataStruct = importdata('PatData_SimParams_Input-.txt');
+    DataStruct = importdata('BCHF1_InputData.txt');
     
-    FlagData_Vect = DataStruct.data(1:8,1);
-    PatData_Vect = DataStruct.data(1:4,2);
-    RHCData_Vect = DataStruct.data(1:10,3);
-    if (FlagData_Vect(1) == 1)
-        EchoData_Vect = DataStruct.data(1:4,4);
+    FlagData_Vect = DataStruct.data(1:8,1);                 % Flags controlling code
+    PatData_Vect = DataStruct.data(1:4,2);                  % General patient data
+    RHCData_Vect = DataStruct.data(1:10,3);                 % RHC data
+    if (FlagData_Vect(1) == 1)                              % RHC+Echo data present
+        EchoData_Vect = DataStruct.data(1:4,4);             % Echo data
         if (FlagData_Vect(2) == 1)
-            SimOptSpecs_Vect = DataStruct.data(1:2,5);
-        else
+            SimOptSpecs_Vect = DataStruct.data(1:2,5);      % Hand tune sim beats
+        else                                                %  and plot beats 
             if (FlagData_Vect(3) == 1)
-                SimOptSpecs_Vect = DataStruct.data(1:4,5);
-            else
-                SimOptSpecs_Vect = DataStruct.data(1:6,5);
-            end
-            Num_DataRows = size(DataStruct.data,1);
-            AdjParam_Vect = DataStruct.data(1:Num_DataRows,6);
+                SimOptSpecs_Vect = DataStruct.data(1:4,5);  % fmc optim sim, optim
+            else                                            %  beats and fmc specs
+                SimOptSpecs_Vect = DataStruct.data(1:6,5);  % GA optim sim, optim
+            end                                             %  beats and GA specs
+            Num_DataRows = size(DataStruct.data,1);         % Find num of adj params
+            AdjParam_Vect = ...                             % Load adj parameter
+                DataStruct.data(1:Num_DataRows,6);          %  numbers
         end
-    else
+    else                                                    % RHC data only present
         if (FlagData_Vect(2) == 1)
-            SimOptSpecs_Vect = DataStruct.data(1:2,4);
-        else
+            SimOptSpecs_Vect = DataStruct.data(1:2,4);      % Hand tune sim beats
+        else                                                %  and plot beats 
             if (FlagData_Vect(3) == 1)
-                SimOptSpecs_Vect = DataStruct.data(1:4,4);
-            else
-                SimOptSpecs_Vect = DataStruct.data(1:6,4);
-            end
-            Num_DataRows = size(DataStruct.data,1);
-            AdjParam_Vect = DataStruct.data(1:Num_DataRows,5);
+                SimOptSpecs_Vect = DataStruct.data(1:4,4);  % fmc optim sim, optim
+            else                                            %  beats and fmc specs
+                SimOptSpecs_Vect = DataStruct.data(1:6,4);  % GA optim sim, optim
+            end                                             %  beats and GA specs
+            Num_DataRows = size(DataStruct.data,1);         % Find num of adj params
+            AdjParam_Vect = ...                             % Load adj parameter
+                DataStruct.data(1:Num_DataRows,5);          %  numbers
         end
     end
     
@@ -95,19 +97,19 @@
     if (SmithParam_Flag == 0)
            
         % We are running patient data simulation or optimization so get the 
-        % general data of study patient number, weight, height and gender
+        % general data of study patient number, weight, height and sex
         DID_Num = ...                               % Deidentified subject number
             ['BCHF' num2str(PatData_Vect(1))];                     
         BW = PatData_Vect(2);                       % Body weight (kg)
         Hgt = PatData_Vect(3);                      % Height (cm)
-        if (PatData_Vect(4) == 1)                   % Gender (M or F)
-            Gender = 'M';  
+        if (PatData_Vect(4) == 1)                   % Sex (M or F)
+            Sex = 'M';  
         else
-            Gender = 'F';
+            Sex = 'F';
         end
         % Save all patient data into a structure to be passed to functions
-        PatData_Values = {DID_Num BW Hgt Gender};
-        PatData_Fields = {'DID_Num' 'BW' 'Hgt' 'Gender'};
+        PatData_Values = {DID_Num BW Hgt Sex};
+        PatData_Fields = {'DID_Num' 'BW' 'Hgt' 'Sex'};
         PatData_Struct = cell2struct(PatData_Values, ...
             PatData_Fields,2);
         
@@ -149,10 +151,10 @@
         HR_Smith = 80;                              % Average heart rate (beats/min)
         BW = 72.3;                                  % Body weight (kg, ~160 lbs)
         Hgt = 178;                                  % Height (cm, ~5'10")
-        Gender = 'M';                               % Assuming male since TotBV ~ 5L
+        Sex = 'M';                                  % Assuming male since TotBV ~ 5L
         
-        PatData_Values = {DID_Num HR_Smith BW Hgt Gender};
-        PatData_Fields = {'DID_Num' 'HR_Smith' 'BW' 'Hgt' 'Gender'};
+        PatData_Values = {DID_Num HR_Smith BW Hgt Sex};
+        PatData_Fields = {'DID_Num' 'HR_Smith' 'BW' 'Hgt' 'Sex'};
         PatData_Struct = cell2struct(PatData_Values, ...
             PatData_Fields,2);
         
@@ -632,9 +634,9 @@
     if (SmithParam_Flag == 1)                       % Smith et al. simulation
         
         % RUN SMITH ET AL. SIMULATION
-        % Calculate total blood volume based on height, weight and gender. 
+        % Calculate total blood volume based on height, weight and sex. 
         %  This expression is from Nadler et al. Surgery 51:224,1962.
-        if (Gender == 'M')
+        if (Sex == 'M')
             TotBV = ((0.3669 * (Hgt/100)^3) + ...
                 (0.03219 * BW) + 0.6041) * 1000;
         else
@@ -734,10 +736,10 @@
             
     else                                            % Optim or handtune
         
-        % Calculate total blood volume based on height, weight and gender
+        % Calculate total blood volume based on height, weight and sex
         %  which is the same for both RHC and Echo simulations
         %  This expression is from Nadler et al. Surgery 51:224,1962.
-        if (Gender == 'M')
+        if (Sex == 'M')
             TotBV = ((0.3669 * (Hgt/100)^3) + ...
                 (0.03219 * BW) + 0.6041) * 1000;
         else
@@ -810,7 +812,7 @@
             [T_Out_RHC,X_Out_RHC] = ode15s(@dXdT_Smith, ...
                 TSpan_SS,X0,ODE_Opts,DriverP_Struct,CVParam_Struct);
             
-            % CALCULATING INTERMEDIATE PRESSURES TO PLOT
+            % CAPTURING INTERMEDIATE PRESSURES TO PLOT
             Num_TOut_RHC = size(T_Out_RHC,1); % Number of time points
             P_LV_RHC = zeros(Num_TOut_RHC,1); % Preallocating matrices
             P_RV_RHC = zeros(Num_TOut_RHC,1);
@@ -818,8 +820,6 @@
             P_VC_RHC = zeros(Num_TOut_RHC,1);
             P_PA_RHC = zeros(Num_TOut_RHC,1);
             P_PU_RHC = zeros(Num_TOut_RHC,1);
-            V_LVES_RHC = 1000;
-            V_LVED_RHC = 0;
             % RUNNING MODEL TO GET INTERMEDIATES
             for i = 1:Num_TOut_RHC
                 VarOut = dXdT_Smith(T_Out_RHC(i), ...
@@ -831,13 +831,7 @@
                 P_VC_RHC(i) = VarOut(4);
                 P_PA_RHC(i) = VarOut(5);
                 P_PU_RHC(i) = VarOut(6);
-                V_LVES_RHC = ...
-                    min(V_LVES_RHC,X_Out_RHC(i,1));
-                V_LVED_RHC = ...
-                    max(V_LVED_RHC,X_Out_RHC(i,1));
             end
-            CO_RHCSim = ((V_LVED_RHC - ...
-                V_LVES_RHC) * HR_RHC) / 1000;
                 
             % RUN ECHO SIMULATION NEXT
             % Build driver function parameter structure
@@ -866,13 +860,11 @@
             % Solve over the time span with ode15s
             [T_Out_Echo,X_Out_Echo] = ode15s(@dXdT_Smith, ...
                 TSpan_SS,X0,ODE_Opts,DriverP_Struct,CVParam_Struct);
-            % CALCULATING CO OF ECHO SIMULATION
+            % CAPTURING THE LEFT AND RIGHT VENTRICULAR PRESSURES
             Num_TOut_Echo = ...                         % Number of time points
                 size(T_Out_Echo,1);
-            P_LV_Echo = zeros(Num_TOut_Echo,1);           % Preallocating matrices
+            P_LV_Echo = zeros(Num_TOut_Echo,1);         % Preallocating matrices
             P_RV_Echo = zeros(Num_TOut_Echo,1);
-            V_LVES_Echo = 1000;
-            V_LVED_Echo = 0;
             % FINDING LV END DIASTOLIC AND END SYSTOLIC VOLUME
             for i = 1:Num_TOut_Echo
                 VarOut = dXdT_Smith(T_Out_Echo(i), ...
@@ -880,13 +872,7 @@
                     CVParam_Struct,1);
                 P_LV_Echo(i) = VarOut(1);
                 P_RV_Echo(i) = VarOut(2);
-                V_LVES_Echo = ...
-                    min(V_LVES_Echo,X_Out_Echo(i,1));
-                V_LVED_Echo = ...
-                    max(V_LVED_Echo,X_Out_Echo(i,1));
             end
-            CO_EchoSim = ((V_LVED_Echo - ...
-                V_LVES_Echo) * HR_Echo) / 1000;
             
             % GETTING THE RESIDUAL AT THE OPTIM PARAMETER VALUES
             if (HandTune_Flag == 0 && OptimBest_Flag == 0 && SmithParam_Flag == 0)
@@ -925,7 +911,7 @@
             [T_Out_RHC,X_Out_RHC] = ode15s(@dXdT_Smith, ...
                 TSpan_SS,X0,ODE_Opts,DriverP_Struct,CVParam_Struct);
             
-            % CALCULATING INTERMEDIATE PRESSURES TO PLOT
+            % CAPTURING INTERMEDIATE PRESSURES TO PLOT
             Num_TOut_RHC = size(T_Out_RHC,1); % Number of time points
             P_LV_RHC = zeros(Num_TOut_RHC,1); % Preallocating matrices
             P_RV_RHC = zeros(Num_TOut_RHC,1);
@@ -933,8 +919,6 @@
             P_VC_RHC = zeros(Num_TOut_RHC,1);
             P_PA_RHC = zeros(Num_TOut_RHC,1);
             P_PU_RHC = zeros(Num_TOut_RHC,1);
-            V_LVES_RHC = 1000;
-            V_LVED_RHC = 0;
             % RUNNING MODEL TO GET INTERMEDIATES
             for i = 1:Num_TOut_RHC
                 VarOut = dXdT_Smith(T_Out_RHC(i), ...
@@ -946,13 +930,7 @@
                 P_VC_RHC(i) = VarOut(4);
                 P_PA_RHC(i) = VarOut(5);
                 P_PU_RHC(i) = VarOut(6);
-                V_LVES_RHC = ...
-                    min(V_LVES_RHC,X_Out_RHC(i,1));
-                V_LVED_RHC = ...
-                    max(V_LVED_RHC,X_Out_RHC(i,1));
             end
-            CO_RHCSim = ((V_LVED_RHC - ...
-                V_LVES_RHC) * HR_RHC) / 1000;
             
             % GETTING THE RESIDUAL AT THE OPTIM PARAMETER VALUES
             if (HandTune_Flag == 0 && OptimBest_Flag == 0 && SmithParam_Flag == 0)
@@ -1040,24 +1018,70 @@
             P_AOSim = P_AO_RHC(tStartRHC_Ind:end);
             P_PASim = P_PA_RHC(tStartRHC_Ind:end);
             P_PUSim = P_PU_RHC(tStartRHC_Ind:end);
-            V_LVSim = X_Out_Echo(tStartEcho_Ind:end,1);
-            V_RVSim = X_Out_Echo(tStartEcho_Ind:end,2);
+            V_LVRHCSim = X_Out_RHC(tStartRHC_Ind:end,1);
+            V_RVRHCSim = X_Out_RHC(tStartRHC_Ind:end,2);
+            V_LVED_RHC = max(V_LVRHCSim);
+            V_LVES_RHC = min(V_LVRHCSim);    
+            CO_RHCSim = ((V_LVED_RHC - V_LVES_RHC) * HR_RHC) / 1000;
+            V_LVEchoSim = X_Out_Echo(tStartEcho_Ind:end,1);
+            V_RVEchoSim = X_Out_Echo(tStartEcho_Ind:end,2);
+            V_LVED_Echo = max(V_LVEchoSim);
+            V_LVES_Echo = min(V_LVEchoSim); 
+            CO_EchoSim = ((V_LVED_Echo - V_LVES_Echo) * HR_Echo) / 1000;
             P_LVRHCSim = P_LV_RHC(tStartRHC_Ind:end);
             P_LVEchoSim = P_LV_Echo(tStartEcho_Ind:end);
             P_VCSim = P_VC_RHC(tStartRHC_Ind:end);
         
             SimPlot_Values = {T_OutRHC T_OutEcho P_RVRHCSim ...
                 P_RVEchoSim P_AOSim P_PASim P_PUSim CO_RHCSim ...
-                CO_EchoSim V_LVSim V_RVSim P_LVRHCSim ...
+                CO_EchoSim V_LVEchoSim V_RVEchoSim P_LVRHCSim ...
                 P_LVEchoSim P_VCSim};
             SimPlot_Fields = {'T_OutRHC' 'T_OutEcho' 'P_RVRHCSim' ...
                 'P_RVEchoSim' 'P_AOSim' 'P_PASim' 'P_PUSim' ...
-                'CO_RHCSim' 'CO_EchoSim' 'V_LVSim' 'V_RVSim' ...
+                'CO_RHCSim' 'CO_EchoSim' 'V_LVEchoSim' 'V_RVEchoSim' ...
                 'P_LVRHCSim' 'P_LVEchoSim' 'P_VCSim'};
             SimPlot_Struct = cell2struct(SimPlot_Values, ...
                 SimPlot_Fields,2);
      
             SixPanel_Figure(AllStruct_Struct,SimPlot_Struct)
+            
+            % CHECK TO MAKE SURE WE HAVE REACHED STEADY STATE
+            % GET VOLUMES TO PLOT
+            V_RVED_Echo = max(V_RVEchoSim);
+            V_RVES_Echo = min(V_RVEchoSim); 
+            CO_RVEchoSim = ((V_RVED_Echo - V_RVES_Echo) * HR_Echo) / 1000;
+            VTotEcho = X_Out_Echo(tStartEcho_Ind:end,1) + ...
+                X_Out_Echo(tStartEcho_Ind:end,2) + ...
+                X_Out_Echo(tStartEcho_Ind:end,3) + ...
+                X_Out_Echo(tStartEcho_Ind:end,4) + ...
+                X_Out_Echo(tStartEcho_Ind:end,5) + ...
+                X_Out_Echo(tStartEcho_Ind:end,6); 
+            VTotRHC = X_Out_RHC(tStartRHC_Ind:end,1) + ...
+                X_Out_RHC(tStartRHC_Ind:end,2) + ...
+                X_Out_RHC(tStartRHC_Ind:end,3) + ...
+                X_Out_RHC(tStartRHC_Ind:end,4) + ...
+                X_Out_RHC(tStartRHC_Ind:end,5) + ...
+                X_Out_RHC(tStartRHC_Ind:end,6); 
+            % PLOT ALL IN ONE FIGURE
+            ScrSize = get(0,'ScreenSize');              % Getting screen size
+            VolCheck_Fig = figure('Position', ...       % Positioning the figure
+                [ScrSize(3)/50 ScrSize(4)/50 ...        %  on the screen
+                ScrSize(3)/2 ScrSize(4)/2]); 
+            plot(T_OutRHC,VTotRHC,'-b','LineWidth',3)
+            hold on
+            plot(T_OutEcho,VTotEcho,':k','LineWidth',3)
+            plot(T_OutEcho,X_Out_Echo(tStartEcho_Ind:end,1),'--r','LineWidth',3)
+            plot(T_OutEcho,X_Out_Echo(tStartEcho_Ind:end,2),'--g','LineWidth',3)
+            plot(T_OutEcho,X_Out_Echo(tStartEcho_Ind:end,3),'--b','LineWidth',3)
+            plot(T_OutEcho,X_Out_Echo(tStartEcho_Ind:end,4),':r','LineWidth',3)
+            plot(T_OutEcho,X_Out_Echo(tStartEcho_Ind:end,5),':g','LineWidth',3)
+            plot(T_OutEcho,X_Out_Echo(tStartEcho_Ind:end,6),':b','LineWidth',3)
+            hold off
+            legend('V_{Tot,RHC}','V_{Tot,Echo}','V_{LV,Echo}', ...
+                'V_{RV,Echo}', 'V_{PA,Echo}', 'V_{PU,Echo}', ...
+                'V_{AO,Echo}', 'V_{VC,Echo}')
+            xlabel('Time, s','FontSize',14,'FontWeight','bold')
+            ylabel('Volume, mL','FontSize',14,'FontWeight','bold')
             
         else
             
@@ -1093,35 +1117,5 @@
         SaveFile2 = 'OptimParams.mat';
         save(SaveFile2,'Expp_Optim','AdjParam_Strngs','Res_Optim')
     end
-    
-    
-    %     % CALCULATING INTERMEDIATE PRESSURES TO PLOT
-%     Num_TOut = size(T_Out,1);                       % Number of time points
-%     P_LVSim = zeros(Num_TOut,1);                    % Preallocating matrices
-%     P_RVSim = zeros(Num_TOut,1);
-%     P_AOSim = zeros(Num_TOut,1);
-%     P_VCSim = zeros(Num_TOut,1);
-%     P_PASim = zeros(Num_TOut,1);
-%     P_PUSim = zeros(Num_TOut,1);
-%     V_LVESSim = 1000;
-%     V_LVEDSim = 0;
-%     % RUNNING MODEL TO GET INTERMEDIATES
-%     for i = 1:Num_TOut
-%         VarOut = dXdT_Smith(T_Out(i),X_Out(i,:),CVParam_Struct,1);
-%         P_LVSim(i) = VarOut(1);
-%         P_RVSim(i) = VarOut(2);
-%         P_AOSim(i) = VarOut(3);
-%         P_VCSim(i) = VarOut(4);
-%         P_PASim(i) = VarOut(5);
-%         P_PUSim(i) = VarOut(6);
-%         V_LVESSim = min(V_LVESSim,X_Out(i,1));
-%         V_LVEDSim = max(V_LVEDSim,X_Out(i,1));
-%     end
-%     CO_Sim = ((V_LVEDSim - V_LVESSim) * Ave_HR) / 1000;
-%     if (HandTune_Flag == 0 && OptimBest_Flag == 0 && SmithParam_Flag == 0)
-%         Res_Optim = Smith_ObjFun(p_Optim,PatData_Struct, ...
-%             CVParam_Struct,SimOptParam_Struct);
-%     end
-
     
     toc

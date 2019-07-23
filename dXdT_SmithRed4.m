@@ -11,7 +11,7 @@
 %   been removed.
 %
 %   Model originally created on     20 September 2018
-%   Model last modfied on           20 September 2018
+%   Model last modfied on           16      July 2019
 %
 %   Reproduced by       Brian Carlson
 %                       Physiological Systems Dynamics Laboratory
@@ -22,14 +22,15 @@
 %  START OF  	   d X d t  for   R E D U C E D   S M I T H   M O D E L   V E R 1
 % ***********************************************************************************
 
-    function [Var_Out] = dXdT_SmithRed4(time,X,CVParam_Struct,varargin)
+    function [Var_Out] = dXdT_SmithRed4(time,X,DriverP_Struct, ...
+        CVParam_Struct,varargin)
 
     % UNPACK FIXED PARAMETERS
     % Elastance function driver parameters
-    period = CVParam_Struct.period;                 % Period of heart beat (s)
+    period = DriverP_Struct.period;                 % Period of heart beat (s)
     A = CVParam_Struct.A;                           % Elastance function param (uls)
-    B = CVParam_Struct.B;                           % Elastance fctn param (1/s^2)
-    C = CVParam_Struct.C;                           % Elastance fctn param (s)
+    B = DriverP_Struct.B;                           % Elastance fctn param (1/s^2)
+    C = DriverP_Struct.C;                           % Elastance fctn param (s)
     % Left ventricle free wall parameters
     E_es_lvf = CVParam_Struct.E_es_lvf;             % LV free wall elastance (kPa/mL)
     P_0_lvf = CVParam_Struct.P_0_lvf;               % LV ED pressure param (kPa)
@@ -76,11 +77,11 @@
     Q_mt = (P_pu - P_lv) / R_mt;
     P_ao = E_es_ao * V_ao;
     Q_av = (P_lv - P_ao) / R_av;
-    if ((Q_mt < 0) && (Q_av < 0)) 
+    if ((Q_mt <= 0) && (Q_av <= 0)) 
         dVlvdt = 0; 
-    elseif (Q_mt < 0) 
+    elseif (Q_mt <= 0) 
         dVlvdt = (-1) * Q_av;
-    elseif (Q_av < 0) 
+    elseif (Q_av <= 0) 
         dVlvdt = Q_mt; 
     else
         dVlvdt = Q_mt - Q_av;
@@ -98,11 +99,11 @@
     Q_tc = (P_vc - P_rv) / R_tc;
     P_pa = E_es_pa * V_pa;
     Q_pv = (P_rv - P_pa) / R_pv;
-    if ((Q_tc < 0) && (Q_pv < 0)) 
+    if ((Q_tc <= 0) && (Q_pv <= 0)) 
         dVrvdt = 0; 
-    elseif (Q_tc < 0) 
+    elseif (Q_tc <= 0) 
         dVrvdt = (-1) * Q_pv;
-    elseif (Q_pv < 0) 
+    elseif (Q_pv <= 0) 
         dVrvdt = Q_tc; 
     else
         dVrvdt = Q_tc - Q_pv;
@@ -110,12 +111,12 @@
 
 	%   <component name="pulmonary_artery and vein">
 	Q_pul = (P_pa - P_pu) / R_pul;
-    if (Q_pv < 0)
+    if (Q_pv <= 0)
         dVpadt = -1 * Q_pul;
     else
         dVpadt = Q_pv - Q_pul;
     end
-    if (Q_mt < 0)
+    if (Q_mt <= 0)
         dVpudt = Q_pul;
     else
         dVpudt = Q_pul - Q_mt;
@@ -123,12 +124,12 @@
     
 	%   <component name="aorta and vena cava">
     Q_sys = (P_ao - P_vc) / R_sys;
-    if (Q_av < 0)
+    if (Q_av <= 0)
         dVaodt = -1 * Q_sys;
     else
         dVaodt = Q_av - Q_sys;
     end
-    if (Q_tc < 0)
+    if (Q_tc <= 0)
         dVvcdt = Q_sys;
     else
         dVvcdt = Q_sys - Q_tc;

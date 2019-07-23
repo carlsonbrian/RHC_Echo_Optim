@@ -84,8 +84,8 @@
             P_PUSim = SimPlot_Struct.P_PUSim;
             CO_RHCSim = SimPlot_Struct.CO_RHCSim;
             CO_EchoSim = SimPlot_Struct.CO_EchoSim;
-            V_LVSim = SimPlot_Struct.V_LVSim;
-            V_RVSim = SimPlot_Struct.V_RVSim;
+            V_LVSim = SimPlot_Struct.V_LVEchoSim;
+            V_RVSim = SimPlot_Struct.V_RVEchoSim;
             P_LVSim = SimPlot_Struct.P_LVRHCSim;
             P_LVEchoSim = SimPlot_Struct.P_LVEchoSim;
             P_VCSim = SimPlot_Struct.P_VCSim;
