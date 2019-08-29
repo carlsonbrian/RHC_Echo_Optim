@@ -37,13 +37,24 @@
     tic
     warning('off','all');
     
-    DataStruct = importdata('BCHF1Red4_InputData.txt');
+    Delim_In = '\t';
+    Num_HeadLns = 42;
+    DataStruct = importdata('BCHF1Red4_InputData.txt',Delim_In,Num_HeadLns);
+    
+    if (size(DataStruct.data,1) == 9)
+        NaN_Pad = [];
+        NumCols = size(DataStruct.data,2);
+        for i = 1:NumCols
+            NaN_Pad = [NaN_Pad NaN];
+        end
+        DataStruct.data = [DataStruct.data; NaN_Pad];
+    end
     
     FlagData_Vect = DataStruct.data(1:8,1);                 % Flags controlling code
     PatData_Vect = DataStruct.data(1:4,2);                  % General patient data
     RHCData_Vect = DataStruct.data(1:10,3);                 % RHC data
     if (FlagData_Vect(1) == 1)                              % RHC+Echo data present
-        EchoData_Vect = DataStruct.data(1:4,4);             % Echo data
+        EchoData_Vect = DataStruct.data(1:6,4);             % Echo data
         if (FlagData_Vect(2) == 1)
             SimOptSpecs_Vect = DataStruct.data(1:2,5);      % Hand tune sim beats
         else                                                %  and plot beats 
@@ -126,7 +137,11 @@
        	P_AOdiast = RHCData_Vect(7);                % Diastolic aortic press (mmHg)
        	HR_RHC = RHCData_Vect(8);                   % Average heart rate (beats/min)
        	CO_Fick = RHCData_Vect(9);                  % Cardiac output Fick (L/min)
-       	CO_Thermo = RHCData_Vect(10);               % Cardiac outpt thermodil (L/min)
+        if (isnan(RHCData_Vect(10)))
+            CO_Thermo = -1;                         % No CO thermo in RHC record
+        else
+            CO_Thermo = RHCData_Vect(10);           % Cardiac outpt thermodil (L/min)
+        end
         % Save all RHC data into a structure to be passed to functions
         RHCData_Values = {P_RVsyst P_RVdiast P_PAsyst P_PAdiast ....
             P_PCWave P_AOsyst P_AOdiast HR_RHC CO_Fick CO_Thermo};
@@ -137,13 +152,26 @@
         
         % Get the echo data if present in the input file
         if (RHCEcho_Flag == 1)
-            V_LVsyst = EchoData_Vect(1);            % Systolic LV volume (mL)
-            V_LVdiast = EchoData_Vect(2);           % Diastolic LV volume (mL)
+            ID_LVsyst = EchoData_Vect(1);           % Systolic LV inner diam (mm)
+            ID_LVdiast = EchoData_Vect(2);          % Diastolic LV inner diam (mm)
             HR_Echo	= EchoData_Vect(3);             % Average heart rate (beats/min)
-            CO_EchoD = EchoData_Vect(4);            % Cardiac output Echo-Dop (L/min)
+            if (isnan(EchoData_Vect(4)))
+                CO_EchoD = -1;                      % No Echo-Dop cardiac output
+            else
+                CO_EchoD = EchoData_Vect(4);        % Cardiac output Echo-Dop (L/min)
+            end
+            if (isnan(EchoData_Vect(5)))            
+                V_LVsyst = -1;                      % 2D echo volumes
+                V_LVdiast = -1;                     %  were not calculated
+            else
+                V_LVsyst = EchoData_Vect(5);        % Systolic LV volume (mL)
+                V_LVdiast = EchoData_Vect(6);       % Diastolic LV volume (mL)
+            end
             % Save all Echo data into a structure to be passed to functions
-            EchoData_Values = {V_LVsyst V_LVdiast HR_Echo CO_EchoD};
-            EchoData_Fields = {'V_LVsyst' 'V_LVdiast' 'HR_Echo' 'CO_EchoD'};
+            EchoData_Values = {ID_LVsyst ID_LVdiast HR_Echo ...
+                CO_EchoD V_LVsyst V_LVdiast};
+            EchoData_Fields = {'ID_LVsyst' 'ID_LVdiast' 'HR_Echo' ...
+                'CO_EchoD' 'V_LVsyst' 'V_LVdiast'};
             EchoData_Struct = cell2struct(EchoData_Values, ...
                 EchoData_Fields,2);
         end
