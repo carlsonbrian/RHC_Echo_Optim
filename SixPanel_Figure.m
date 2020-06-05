@@ -83,8 +83,8 @@
         P_PASim = SimPlot_Struct.P_PASim;
         P_PUSim = SimPlot_Struct.P_PUSim;
         CO_Sim = SimPlot_Struct.CO_Sim;
-        V_LVSim = SimPlot_Struct.V_LVSim;
-        V_RVSim = SimPlot_Struct.V_RVSim;
+        V_LVSim = SimPlot_Struct.V_LVEchoSim;
+        V_RVSim = SimPlot_Struct.V_RVEchoSim;
         P_LVSim = SimPlot_Struct.P_LVSim;
         P_VCSim = SimPlot_Struct.P_VCSim;
         
@@ -281,7 +281,7 @@
         'FontSize',20,'FontWeight','bold')
     
 
-    %% SUBPLOT OF V_LV and V_RV WITH NO DATA SHOWN
+    %% SUBPLOT OF V_LV and V_RV WITH V_LV DATA SHOWN
     subplot(2,3,2)
         if (RHCEcho_Flag == 1 && SmithParam_Flag == 0)
             T_OutVols = T_OutEcho;
@@ -319,6 +319,25 @@
                 max(V_RVSim));
             VMin_SP2 = 0.85*min(min(V_LVSim), ...
                 min(V_RVSim));
+        end
+        if ((SmithParam_Flag == 0) && (RHCEcho_Flag == 1))
+            if (V_LVsyst ~= -1)
+                T_OutVols(1)
+                T_OutVols(end)
+                plot([T_OutVols(1) T_OutVols(end)], ...
+                    [V_LVsyst V_LVsyst], ...
+                    '-.k','LineWidth',1.5)
+                plot([T_OutVols(1) T_OutVols(end)], ...
+                    [V_LVdiast V_LVdiast], ...
+                    ':k','LineWidth',1.5)
+            else
+                plot([T_OutVols(1) T_OutVols(end)], ...
+                    [V_LVsyst_Teich V_LVsyst_Teich], ...
+                    '-.k','LineWidth',1.5)
+                plot([T_OutVols(1) T_OutVols(end)], ...
+                    [V_LVdiast_Teich V_LVdiast_Teich], ...
+                    ':k','LineWidth',1.5)
+            end
         end
         xlim([0 5])                             % Formatting subplot
         ylim([VMin_SP2 VMax_SP2])

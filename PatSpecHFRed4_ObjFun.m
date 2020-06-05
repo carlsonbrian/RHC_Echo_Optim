@@ -150,7 +150,7 @@ function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
     if (RHCEcho_Flag == 1)                          % If 1 both RHC and Echo data
         
         % Use a try catch in case the parameter values cause a crash 
-%         try
+        try
             
             % Set initial conditions on explicit state
             %  variables for both RHC and Echo simulations
@@ -164,15 +164,15 @@ function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
             % FIRST PERFORM THE RHC SIMULATION
             % Build a structure with the RHC driver parameters
             HR = HR_RHC_Data;                       % RHC heart rate (beats/min)
-            period = 60/HR_RHC_Data;                % Period of heart beat (s)
-            B = HR_RHC_Data;                        % Elastance fctn param (1/s^2)
-            C = period/2;                           % Elastance fctn param (s)
-            DriverP_Values = {HR period B C};
+            period_RHC = 60/HR_RHC_Data;            % Period of heart beat (s)
+            B_RHC = HR_RHC_Data;                    % Elastance fctn param (1/s^2)
+            C_RHC = period_RHC/2;                   % Elastance fctn param (s)
+            DriverP_Values = {HR period_RHC B_RHC C_RHC};
             DriverP_Fields = {'HR' 'period' 'B' 'C'};
             DriverP_Struct = cell2struct(DriverP_Values, ...
                 DriverP_Fields,2);
             % Calculating timespans to reach steady state
-            TSpan_SS = [0 NumBeats_SS * period];
+            TSpan_SS = [0 NumBeats_SS * period_RHC];
             % Solve over the steady state time span with ode15s
             [T_RHC_Out,X_RHC_Out] = ...
                 ode15s(@dXdT_SmithRed4,TSpan_SS,X0, ...
@@ -180,7 +180,7 @@ function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
            
             %  Now run Smith et al. model to get intermediate pressures
             Num_TOut_RHC = size(T_RHC_Out,1);    % Number of time points
-            P_RV_RHC = zeros(Num_TOut_RHC,1); % Preallocate matrices
+            P_RV_RHC = zeros(Num_TOut_RHC,1);    % Preallocate matrices
             P_AO_RHC = zeros(Num_TOut_RHC,1);
             P_PA_RHC = zeros(Num_TOut_RHC,1);
             P_PU_RHC = zeros(Num_TOut_RHC,1);
@@ -197,15 +197,15 @@ function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
             % NEXT PERFORM THE ECHO SIMULATION
             % Build a structure with the Echo driver parameters
             HR = HR_Echo_Data;                      % RHC heart rate (beats/min)
-            period = 60/HR_Echo_Data;               % Period of heart beat (s)
-            B = HR_Echo_Data;                       % Elastance fctn param (1/s^2)
-            C = period/2;                           % Elastance fctn param (s)
-            DriverP_Values = {HR period B C};
+            period_Echo = 60/HR_Echo_Data;          % Period of heart beat (s)
+            B_Echo = HR_Echo_Data;                  % Elastance fctn param (1/s^2)
+            C_Echo = period_Echo/2;                 % Elastance fctn param (s)
+            DriverP_Values = {HR period_Echo B_Echo C_Echo};
             DriverP_Fields = {'HR' 'period' 'B' 'C'};
             DriverP_Struct = cell2struct(DriverP_Values, ...
                 DriverP_Fields,2);
             % Calculating timespans to reach steady state
-            TSpan_SS = [0 NumBeats_SS * period];
+            TSpan_SS = [0 NumBeats_SS * period_Echo];
             
             % Solve over the steady state time span with ode15s
             [T_Echo_Out,X_Echo_Out] = ...
@@ -234,10 +234,11 @@ function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
                 %  that we want to calculate the residual from and then finding 
                 %  the portion of the simulation to extract values from
                 TimeStart_RHCResCalc = ...
-                    (NumBeats_SS - NumBeats_ResPlot) * period;
+                    (NumBeats_SS - NumBeats_ResPlot) * period_RHC;
                 tIndStart_RHCResCalc = ...
                     find((T_RHC_Out >= TimeStart_RHCResCalc),1,'first');
                 % Looking for systolic and diastolic values in simulation results
+                
                 for i = tIndStart_RHCResCalc:Num_TOut_RHC
                     P_RVsyst_RHCSim = max(P_RVsyst_RHCSim,P_RV_RHC(i));
                     P_RVdiast_RHCSim = min(P_RVdiast_RHCSim,P_RV_RHC(i));
@@ -265,7 +266,7 @@ function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
                 %  that we want to calculate the residual from and then finding
                 %  the portion of the simulation to extract values from
                 TimeStart_EchoResCalc = ...
-                    (NumBeats_SS - NumBeats_ResPlot) * period;
+                    (NumBeats_SS - NumBeats_ResPlot) * period_Echo;
                 tIndStart_EchoResCalc = ...
                     find((T_Echo_Out >= TimeStart_EchoResCalc),1,'first');
                 % Looking for systolic and diastolic values in simulation results
@@ -295,6 +296,8 @@ function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
                 P_AOdiast_Res = abs(P_AOdiast_RHCSim - ...
                     P_AOdiast_Data) / P_AOsyst_Data;
                 % Pulmonary wedge pressure (in pulmonary vein) normalized residual
+%                 P_PCWave_RHCSim
+%                 P_PCWave_Data
                 P_PCWave_Res = abs(P_PCWave_RHCSim - ...
                     P_PCWave_Data) / P_AOsyst_Data;
                 % Cardiac output normalized residual for both simulations
@@ -382,11 +385,11 @@ function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
                 
             end
             
-%         catch
-%             
-%             Res = 10;
-%             
-%         end
+        catch
+            
+            Res = 10;
+            
+        end
         
     else                                            % Only RHC data
          

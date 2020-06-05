@@ -39,7 +39,7 @@
     
     Delim_In = '\t';
     Num_HeadLns = 42;
-    DataStruct = importdata('BCHF1Red4_InputData.txt',Delim_In,Num_HeadLns);
+    DataStruct = importdata('BCHF15Red4_InputData.txt',Delim_In,Num_HeadLns);
     
     if (size(DataStruct.data,1) == 9)
         NaN_Pad = [];
@@ -550,7 +550,8 @@
             PatSpecHFRed4_ObjFun_Hndl = ...
                 @(p) PatSpecHFRed4_ObjFun(p,AllStruct_Struct);
             % Optimization call
-            p_OptimGA = ga(PatSpecHFRed4_ObjFun_Hndl,Num_AdjParams, ...
+            [p_OptimGA,Res_OptimGA,~,~,FinPopGA,FinScoreGA] = ...
+                ga(PatSpecHFRed4_ObjFun_Hndl,Num_AdjParams, ...
                 [],[],[],[],LowBp,UpBp,[],ga_Opts);
             p_Optim = fmincon(@PatSpecHFRed4_ObjFun,p_OptimGA,[], ...
                 [],[],[],LowBp,UpBp,[],fmc_Opts,AllStruct_Struct);
@@ -724,19 +725,19 @@
             % RUN RHC SIMULATION FIRST
             % Build driver function parameter structure
             HR = HR_RHC;                            % RHC heart rate (beats/min)
-            period = 60/HR_RHC;                     % Period of heart beat (s)
-            B = HR_RHC;                             % Elastance fctn param (1/s^2)
-            C = period/2;                           % Elastance fctn param (s)
-            DriverP_Values = {HR period B C};
+            period_RHC = 60/HR_RHC;                 % Period of heart beat (s)
+            B_RHC = HR_RHC;                         % Elastance fctn param (1/s^2)
+            C_RHC = period_RHC/2;                   % Elastance fctn param (s)
+            DriverP_Values = {HR period_RHC B_RHC C_RHC};
             DriverP_Fields = {'HR' 'period' 'B' 'C'};
             DriverP_Struct = cell2struct(DriverP_Values, ...
                 DriverP_Fields,2);
             % Calculating timespans to reach steady state and then for simulation
-            TSpan_SS = [0 NumBeats_SS * period];
-            
+            TSpan_SSRHC = [0 NumBeats_SS * period_RHC];
+       
             % Solve over the time span with ode15s
             [T_Out_RHC,X_Out_RHC] = ode15s(@dXdT_SmithRed4, ...
-                TSpan_SS,X0,[],DriverP_Struct,CVParam_Struct);
+                TSpan_SSRHC,X0,[],DriverP_Struct,CVParam_Struct);
             
             % CAPTURING INTERMEDIATE PRESSURES TO PLOT
             Num_TOut_RHC = size(T_Out_RHC,1); % Number of time points
@@ -762,16 +763,20 @@
             % RUN ECHO SIMULATION NEXT
             % Build driver function parameter structure
             HR = HR_Echo;                           % RHC heart rate (beats/min)
-            period = 60/HR_Echo;                    % Period of heart beat (s)
-            B = HR_Echo;                            % Elastance fctn param (1/s^2)
-            C = period/2;                           % Elastance fctn param (s)
-            DriverP_Values = {HR period B C};
+            period_Echo = 60/HR_Echo;               % Period of heart beat (s)
+            B_Echo = HR_Echo;                       % Elastance fctn param (1/s^2)
+            C_Echo = period_Echo/2;                 % Elastance fctn param (s)
+            DriverP_Values = {HR period_Echo B_Echo C_Echo};
             DriverP_Fields = {'HR' 'period' 'B' 'C'};
             DriverP_Struct = cell2struct(DriverP_Values, ...
                 DriverP_Fields,2);
+            % Calculating timespans to reach steady state and then for simulation
+            TSpan_SSEcho = [0 NumBeats_SS * period_Echo];
+            
             % Solve over the time span with ode15s
             [T_Out_Echo,X_Out_Echo] = ode15s(@dXdT_SmithRed4, ...
-                TSpan_SS,X0,[],DriverP_Struct,CVParam_Struct);
+                TSpan_SSEcho,X0,[],DriverP_Struct,CVParam_Struct);
+            
             % CAPTURING THE LEFT AND RIGHT VENTRICULAR PRESSURES
             Num_TOut_Echo = ...                     % Number of time points
                 size(T_Out_Echo,1);
@@ -796,15 +801,15 @@
             % RUN RHC SIMULATION ONLY
             % Build driver function parameter structure
             HR = HR_RHC;                            % RHC heart rate (beats/min)
-            period = 60/HR_RHC;                     % Period of heart beat (s)
-            B = HR_RHC;                             % Elastance fctn param (1/s^2)
-            C = period/2;                           % Elastance fctn param (s)
-            DriverP_Values = {HR period B C};
+            period_RHC = 60/HR_RHC;                 % Period of heart beat (s)
+            B_RHC = HR_RHC;                         % Elastance fctn param (1/s^2)
+            C_RHC = period_RHC/2;                   % Elastance fctn param (s)
+            DriverP_Values = {HR period_RHC B_RHC C_RHC};
             DriverP_Fields = {'HR' 'period' 'B' 'C'};
             DriverP_Struct = cell2struct(DriverP_Values, ...
                 DriverP_Fields,2);
             %Calculating timespans to reach steady state and then for simulation
-            TSpan_SS = [0 NumBeats_SS * period];
+            TSpan_SS = [0 NumBeats_SS * period_RHC];
             
             % Solve over the time span with ode15s
             [T_Out_RHC,X_Out_RHC] = ode15s(@dXdT_SmithRed4, ...
@@ -905,10 +910,10 @@
             
             NumBeat_Start = NumBeats_SS - NumBeats_ResPlot;
             tStartRHC_Ind = ...
-                find(T_Out_RHC >= (NumBeat_Start * period),1,'first');
+                find(T_Out_RHC >= (NumBeat_Start * period_RHC),1,'first');
             tStartRHC = T_Out_RHC(tStartRHC_Ind);
             tStartEcho_Ind = ...
-                find(T_Out_Echo >= (NumBeat_Start * period),1,'first');
+                find(T_Out_Echo >= (NumBeat_Start * period_Echo),1,'first');
             tStartEcho = T_Out_Echo(tStartEcho_Ind);
             T_OutRHC = T_Out_RHC(tStartRHC_Ind:end) - tStartRHC;
             T_OutEcho = T_Out_Echo(tStartEcho_Ind:end) - tStartEcho;
@@ -987,7 +992,7 @@
             
             NumBeat_Start = NumBeats_SS - NumBeats_ResPlot;
             tStartRHC_Ind = ...
-                find(T_Out_RHC >= (NumBeat_Start * period),1,'first');
+                find(T_Out_RHC >= (NumBeat_Start * period_RHC),1,'first');
             T_Out = T_Out_RHC(tStartRHC_Ind:end);
             P_RVSim = P_RV_RHC(tStartRHC_Ind:end);
             P_AOSim = P_AO_RHC(tStartRHC_Ind:end);
