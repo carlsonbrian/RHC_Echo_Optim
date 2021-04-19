@@ -11,7 +11,7 @@
 %   been removed.
 %
 %   Model originally created on     20 September 2018
-%   Model last modfied on           16      July 2019
+%   Model last modfied on           24      July 2020
 %
 %   Reproduced by       Brian Carlson
 %                       Physiological Systems Dynamics Laboratory
@@ -32,51 +32,60 @@
     B = DriverP_Struct.B;                           % Elastance fctn param (1/s^2)
     C = DriverP_Struct.C;                           % Elastance fctn param (s)
     % Left ventricle free wall parameters
-    E_es_lvf = CVParam_Struct.E_es_lvf;             % LV free wall elastance (kPa/mL)
-    P_0_lvf = CVParam_Struct.P_0_lvf;               % LV ED pressure param (kPa)
+    E_es_lvf = CVParam_Struct.E_es_lvf;             % LV free wall elstnce (mmHg/mL)
+    P_0_lvf = CVParam_Struct.P_0_lvf;               % LV ED pressure param (mmHg)
     lambda_lvf = CVParam_Struct.lambda_lvf;         % LV ED pressure param (1/mL)
     % Right ventricle free wall parameters
-    E_es_rvf = CVParam_Struct.E_es_rvf;             % RV free wall elastance (kPa/mL)
-    P_0_rvf = CVParam_Struct.P_0_rvf;               % RV ED pressure param (kPa)
+    E_es_rvf = CVParam_Struct.E_es_rvf;             % RV free wall elstnce (mmHg/mL)
+    P_0_rvf = CVParam_Struct.P_0_rvf;               % RV ED pressure param (mmHg)
     lambda_rvf = CVParam_Struct.lambda_rvf;         % RV ED pressure param (1/mL)
     % Pulmonary artery and vein parameters
-    E_es_pa = CVParam_Struct.E_es_pa;               % Pulm artery elastance (kPa/mL)
-    E_es_pu = CVParam_Struct.E_es_pu;               % Pulm vein elastance (kPa/mL)
-    R_pul = CVParam_Struct.R_pul;                   % Pulm vasc resistance (kPa*s/mL)
+    E_es_pa = CVParam_Struct.E_es_pa;               % Pulm arterial elstnce (mmHg/mL)
+    E_es_pu = CVParam_Struct.E_es_pu;               % Pulm venous elastance (mmHg/mL)
+    R_pul = CVParam_Struct.R_pul;                   % Pulm vasc rsistnce (mmHg*s/mL)
     % Aortic and vena cava parameters
-    E_es_ao = CVParam_Struct.E_es_ao;               % Aorta elastance (kPa/mL)
-    E_es_vc = CVParam_Struct.E_es_vc;               % Vena cava elastance (kPa/mL)
-    R_sys = CVParam_Struct.R_sys;                   % Syst art resistance (kPa*s/mL)
+    E_es_sa = CVParam_Struct.E_es_sa;               % Syst arter elastance (mmHg/mL)
+    E_es_sv = CVParam_Struct.E_es_sv;               % Syst venous elastance (mmHg/mL)
+    R_sys = CVParam_Struct.R_sys;                   % Syst vasc rsistnce (mmHg*s/mL)
     % Heart valve paramenters
-    R_mt = CVParam_Struct.R_mt;                     % Mitral valve resist (kPa*s/mL)
-    R_av = CVParam_Struct.R_av;                     % Aortic valve resist (kPa*s/mL)
-    R_tc = CVParam_Struct.R_tc;                     % Tricuspid vlv resist (kPa*s/mL)
-    R_pv = CVParam_Struct.R_pv;                     % Pulmon vlv resist (kPa*s/mL)
+    R_mt = CVParam_Struct.R_mt;                     % Mitral valve resist (mmHg*s/mL)
+    R_av = CVParam_Struct.R_av;                     % Aortic valve resist (mmHg*s/mL)
+    R_tc = CVParam_Struct.R_tc;                     % Tricspd vlv resist (mmHg*s/mL)
+    R_pv = CVParam_Struct.R_pv;                     % Pulmon vlv resist (mmHg*s/mL)
 
     % Unpack the X vector
     V_lv = X(1);
     V_rv = X(2);
     V_pa = X(3);
     V_pu = X(4);
-    V_ao = X(5);
-    V_vc = X(6);
+    V_sa = X(5);
+    V_sv = X(6);
     
-    %   <component name="driver_function">
+    % Elastance function driving heart systole and diastole
     tau = time - (floor(time/period) * period);
 	e_t = A * exp((-1) * B * (tau-C)^2);
     
-    %   <component name="lvf_calculator">
+    % Left ventricular free wall end systole and end diastole PVRs
     V_lvf = V_lv;
 	P_es_lvf = E_es_lvf * V_lvf;
 	P_ed_lvf = P_0_lvf * (exp(lambda_lvf * V_lvf) - 1);
 
-	%   <component name="left_ventricle">
+	% Left ventricular pressure development
 	P_lvf = (e_t * P_es_lvf) + ((1-e_t) * P_ed_lvf);
 	P_lv = P_lvf;
+    
+    % Pulmonary venous pressure development 
+    %  and flow through mitral valve
     P_pu = E_es_pu * V_pu;
     Q_mt = (P_pu - P_lv) / R_mt;
-    P_ao = E_es_ao * V_ao;
-    Q_av = (P_lv - P_ao) / R_av;
+    
+    % Systemic arterial pressure development 
+    %  and flow through aortic valve
+    P_sa = E_es_sa * V_sa;
+    Q_av = (P_lv - P_sa) / R_av;
+    
+    % Change in left ventricular volume based on 
+    %  mitral and aortic valve flow
     if ((Q_mt <= 0) && (Q_av <= 0)) 
         dVlvdt = 0; 
     elseif (Q_mt <= 0) 
@@ -87,18 +96,27 @@
         dVlvdt = Q_mt - Q_av;
     end
     
-    %   <component name="rvf_calculator">
+    % Right ventricular free wall end systole and end diastole PVRs
     V_rvf = V_rv;
 	P_es_rvf = E_es_rvf * V_rvf;
 	P_ed_rvf = P_0_rvf * (exp(lambda_rvf * V_rvf) - 1);
     
-	%   <component name="right_ventricle">
+	% Left ventricular pressure development
 	P_rvf = (e_t * P_es_rvf) + ((1-e_t) * P_ed_rvf);
 	P_rv = P_rvf;
-    P_vc = E_es_vc * V_vc;
-    Q_tc = (P_vc - P_rv) / R_tc;
+    
+    % Systemic venous pressure development 
+    %  and flow through tricuspid valve
+    P_sv = E_es_sv * V_sv;
+    Q_tc = (P_sv - P_rv) / R_tc;
+    
+    % Pulmonary arterial pressure development 
+    %  and flow through pulmonary valve
     P_pa = E_es_pa * V_pa;
     Q_pv = (P_rv - P_pa) / R_pv;
+    
+    % Change in right ventricular volume based on 
+    %  tricuspid and pulmonary valve flow
     if ((Q_tc <= 0) && (Q_pv <= 0)) 
         dVrvdt = 0; 
     elseif (Q_tc <= 0) 
@@ -109,7 +127,8 @@
         dVrvdt = Q_tc - Q_pv;
     end
 
-	%   <component name="pulmonary_artery and vein">
+	% Change in pulmonary vasculature volume based on
+    %  pulmonary and mitral valve flow
 	Q_pul = (P_pa - P_pu) / R_pul;
     if (Q_pv <= 0)
         dVpadt = -1 * Q_pul;
@@ -122,32 +141,35 @@
         dVpudt = Q_pul - Q_mt;
     end
     
-	%   <component name="aorta and vena cava">
-    Q_sys = (P_ao - P_vc) / R_sys;
+	% Change in systemic vasculature volume based on
+    %  aortic and tricuspid valve flow
+    Q_sys = (P_sa - P_sv) / R_sys;
     if (Q_av <= 0)
-        dVaodt = -1 * Q_sys;
+        dVsadt = -1 * Q_sys;
     else
-        dVaodt = Q_av - Q_sys;
+        dVsadt = Q_av - Q_sys;
     end
     if (Q_tc <= 0)
-        dVvcdt = Q_sys;
+        dVsvdt = Q_sys;
     else
-        dVvcdt = Q_sys - Q_tc;
+        dVsvdt = Q_sys - Q_tc;
     end    
     
+    % Returns either the derivatives during integration or the
+    %  intermediate pressures during post integration runs
     if (isempty(varargin))       
         RoC(1) = dVlvdt;
         RoC(2) = dVrvdt;
         RoC(3) = dVpadt;
         RoC(4) = dVpudt;
-        RoC(5) = dVaodt;
-        RoC(6) = dVvcdt;
+        RoC(5) = dVsadt;
+        RoC(6) = dVsvdt;
         Var_Out = RoC';     
     else     
         CalcVars(1) = P_lv;
         CalcVars(2) = P_rv;
-        CalcVars(3) = P_ao;
-        CalcVars(4) = P_vc;
+        CalcVars(3) = P_sa;
+        CalcVars(4) = P_sv;
         CalcVars(5) = P_pa;
         CalcVars(6) = P_pu;
         Var_Out = CalcVars';
