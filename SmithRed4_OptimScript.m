@@ -18,7 +18,7 @@
 %   been removed.
 %
 %   Model originally created on     17  January 2016
-%   Model last modfied on           19 November 2021
+%   Model last modfied on           19 November 2020
 %
 %   Developed by        Brian Carlson
 %                       Physiological Systems Dynamics Laboratory
@@ -386,8 +386,6 @@
         [T_Out_RHC,X_Out_RHC] = ode15s(@dXdT_SmithRed4, ...
             TSpan_SSRHC,X0,[],DriverP_Struct,CVParam_Struct);
 
-        plot(T_Out_RHC,X_Out_RHC(:,1))
-
         % CAPTURING INTERMEDIATE PRESSURES TO PLOT
         Num_TOut_RHC = size(T_Out_RHC,1); % Number of time points
         P_LV_RHC = zeros(Num_TOut_RHC,1); % Preallocating matrices
@@ -440,12 +438,6 @@
             P_RV_Echo(i) = VarOut(2);
         end
 
-%         % GETTING THE RESIDUAL AT THE OPTIM PARAMETER VALUES
-%         if (HandTune_Flag == 0 && OptimBest_Flag == 0 && ...
-%                 NormParam_Flag == 0 && NomParam_Flag == 0)
-%             Res_Optim = PatSpecHFRed4_ObjFun(p_Optim,AllStruct_Struct);
-%         end
-
     else                                        % RHC data only
 
         % RUN RHC SIMULATION ONLY
@@ -486,91 +478,12 @@
             P_PU_RHC(i) = VarOut(6);
         end
 
-%         % GETTING THE RESIDUAL AT THE OPTIM PARAMETER VALUES
-%         if (HandTune_Flag == 0 && OptimBest_Flag == 0 && NormParam_Flag == 0)
-%             Res_Optim = PatSpecHFRed4_ObjFun(p_Optim,AllStruct_Struct);
-%         end
-
     end
         
 
 %% **********************************************************************************
 %  Plot Sim or Opt of   S M I T H   C A R D I O V A S C   M O D E L   S I M / O P T
 % ***********************************************************************************
-
-%     % PLOT NORMAL SIMULATION OR OPTIM/HAND TUNE WITH RHC/ECHO OR RHC ONLY DATA
-%     %  If we are just simulating the Smith et al. result then no data is 
-%     %  plotted and we run one simulation. If we have optimization results or 
-%     %  are performing a hand tune we plot out the simulation with a RHC simulation
-%     %  and an Echo simulation when both datasets are present and only a RHC
-%     %  simulation if only RHC data is present.
-%     
-%     if (NormParam_Flag == 1)
-%         
-%         % NORMAL CARDIOVASCULAR FUNCTION
-%         % Finding the index and the time associated with the last
-%         %  few beats to plot which were used for the residual calculation
-%         NumBeat_Start = NumBeats_SS - NumBeats_ResPlot;     % Starting beat
-%         tStart_Ind = find(T_Out_Norm >= ...                 % Grab the start index
-%             (NumBeat_Start * period),1,'first');
-%         tStart = T_Out_Norm(tStart_Ind);                    % Calc start time
-%         % Saving the the simulations of the last few beats to plot
-%         T_Out = T_Out_Norm(tStart_Ind:end) - tStart;        % Setting start to 0
-%         P_RVSim = P_RV_Norm(tStart_Ind:end);                % P_RV to plot
-%         P_SASim = P_SA_Norm(tStart_Ind:end);                % P_SA to plot
-%         P_PASim = P_PA_Norm(tStart_Ind:end);                % P_PA to plot
-%         P_PUSim = P_PU_Norm(tStart_Ind:end);                % P_PU to plot
-%         V_LVSim = X_Out_Norm(tStart_Ind:end,1);             % V_LV to plot
-%         V_RVSim = X_Out_Norm(tStart_Ind:end,2);             % V_RV to plot
-%         P_LVSim = P_LV_Norm(tStart_Ind:end);                % P_LV to plot
-%         P_SVSim = P_SV_Norm(tStart_Ind:end);                % P_SV to plot
-%         % Capturing min and max left ventricular volume of the 
-%         %  last few beats to calculate cardiac output
-%         V_LVES_Norm = 1000;
-%         V_LVED_Norm = 0;
-%         for i = tStart_Ind:Num_TOut_Norm
-%             V_LVES_Norm = ...
-%                 min(V_LVES_Norm,X_Out_Norm(i,1));
-%             V_LVED_Norm = ...
-%                 max(V_LVED_Norm,X_Out_Norm(i,1));
-%         end
-%         CO_Norm = ((V_LVED_Norm - ...
-%             V_LVES_Norm) * HR_Norm) / 1000;
-%         CO_Sim = CO_Norm;
-%         % Now storing everything into a structure to send to the
-%         %  plotting function SixPanel_Figure
-%         SimPlot_Values = {T_Out P_RVSim P_SASim P_PASim ...
-%             P_PUSim V_LVSim V_RVSim P_LVSim P_SVSim CO_Sim};
-%         SimPlot_Fields = {'T_Out' 'P_RVSim' 'P_SASim' 'P_PASim' ...
-%             'P_PUSim' 'V_LVSim' 'V_RVSim' 'P_LVSim' 'P_SVSim' 'CO_Sim'};
-%         SimPlot_Struct = cell2struct(SimPlot_Values, ...
-%             SimPlot_Fields,2);
-%         % Plotting function call
-%         SixPanel_Figure(AllStruct_Struct,SimPlot_Struct)
-%         
-%         % Saving normal cardiovascular variables so it can be used
-%         %  later to plot against the patient specific results
-%         if (SaveNorm_Flag == 1)
-%             % Saving the values under another name for later
-%             T_SimNorm = T_Out;                              % Normal CV time 
-%             P_RVSimNorm = P_RVSim;                          % Normal CV P_RV 
-%             P_SASimNorm = P_SASim;                          % Normal CV P_SA
-%             P_PASimNorm = P_PASim;                          % Normal CV P_PA
-%             P_PUSimNorm = P_PUSim;                          % Normal CV P_PU
-%             P_LVSimNorm = P_LVSim;                          % Normal CV P_LV
-%             P_SVSimNorm = P_SVSim;                          % Normal CV P_SV
-%             V_LVSimNorm = V_LVSim;                          % Normal CV V_LV
-%             V_RVSimNorm = V_RVSim;                          % Normal CV V_RV
-%             CO_SimNorm = CO_Sim;                            % Normal CV CO
-%             % Save in local folder as NormVars.mat
-%             SaveFile1 = 'NormVars.mat';
-%             save(SaveFile1, 'T_SimNorm', 'P_RVSimNorm', ...
-%                 'P_SASimNorm', 'P_PASimNorm', 'P_PUSimNorm', ...
-%                 'P_LVSimNorm', 'P_SVSimNorm','V_LVSimNorm', ...
-%                 'V_RVSimNorm','CO_SimNorm')
-%         end
-%         
-%     else
         
     if (RHCEcho_Flag == 1)
 
@@ -618,46 +531,6 @@
 
         SixPanel_Figure(AllStruct_Struct,SimPlot_Struct)
 
-        % CHECK TO MAKE SURE WE HAVE REACHED STEADY STATE
-        % GET VOLUMES TO PLOT
-        V_RVED_Echo = max(V_RVEchoSim);
-        V_RVES_Echo = min(V_RVEchoSim); 
-        CO_RVEchoSim = ((V_RVED_Echo - V_RVES_Echo) * HR_Echo) / 1000;
-        VTotEcho = X_Out_Echo(tStartEcho_Ind:end,1) + ...
-            X_Out_Echo(tStartEcho_Ind:end,2) + ...
-            X_Out_Echo(tStartEcho_Ind:end,3) + ...
-            X_Out_Echo(tStartEcho_Ind:end,4) + ...
-            X_Out_Echo(tStartEcho_Ind:end,5) + ...
-            X_Out_Echo(tStartEcho_Ind:end,6); 
-        VTotRHC = X_Out_RHC(tStartRHC_Ind:end,1) + ...
-            X_Out_RHC(tStartRHC_Ind:end,2) + ...
-            X_Out_RHC(tStartRHC_Ind:end,3) + ...
-            X_Out_RHC(tStartRHC_Ind:end,4) + ...
-            X_Out_RHC(tStartRHC_Ind:end,5) + ...
-            X_Out_RHC(tStartRHC_Ind:end,6); 
-
-        % PLOT ALL IN ONE FIGURE
-        ScrSize = get(0,'ScreenSize');              % Getting screen size
-        VolCheck_Fig = figure('Position', ...       % Positioning the figure
-            [ScrSize(3)/50 ScrSize(4)/50 ...        %  on the screen
-            ScrSize(3)/2 ScrSize(4)/2]); 
-        plot(T_OutRHC,VTotRHC,'-b','LineWidth',3)
-        hold on
-        plot(T_OutEcho,VTotEcho,':k','LineWidth',3)
-        plot(T_OutEcho,X_Out_Echo(tStartEcho_Ind:end,1),'--r','LineWidth',3)
-        plot(T_OutEcho,X_Out_Echo(tStartEcho_Ind:end,2),'--g','LineWidth',3)
-        plot(T_OutEcho,X_Out_Echo(tStartEcho_Ind:end,3),'--b','LineWidth',3)
-        plot(T_OutEcho,X_Out_Echo(tStartEcho_Ind:end,4),':r','LineWidth',3)
-        plot(T_OutEcho,X_Out_Echo(tStartEcho_Ind:end,5),':g','LineWidth',3)
-        plot(T_OutEcho,X_Out_Echo(tStartEcho_Ind:end,6),':b','LineWidth',3)
-        hold off
-        legend('V_{Tot,RHC}','V_{Tot,Echo}','V_{LV,Echo}', ...
-            'V_{RV,Echo}', 'V_{PA,Echo}', 'V_{PU,Echo}', ...
-            'V_{AO,Echo}', 'V_{VC,Echo}')
-        xlabel('Time, s','FontSize',14,'FontWeight','bold')
-        ylabel('Volume, mL','FontSize',14,'FontWeight','bold')
-
-
     else
 
         NumBeat_Start = NumBeats_SS - NumBeats_ResPlot;
@@ -685,13 +558,5 @@
 
     end
     
-%     % Saving optimized parameter values, the adjusted parameters
-%     %  and the residual with the optimized parameters
-%     if (HandTune_Flag == 0 && NormParam_Flag == 0 && ...
-%             OptimBest_Flag == 0 && NomParam_Flag == 0)
-%         Expp_Optim = exp(p_Optim);
-%         SaveFile2 = 'OptimParams.mat';
-%         save(SaveFile2,'Expp_Optim','AdjParam_Strngs','Res_Optim')
-%     end
 
     toc

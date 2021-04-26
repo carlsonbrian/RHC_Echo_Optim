@@ -110,3 +110,25 @@ BCHF8Red4_InputData.txt
 BCHF9Red4_InputData.txt
 
 PatData_SimParams_Input.txt
+
+dXdT_Smith.m
+
+dXdT_SmithRed1.m
+
+dXdT_SmithRed2.m
+
+dXdT_SmithRed3.m
+
+PatSpecHF_ObjFun.m
+
+PatSpecHFRed4_ObjFun.m
+
+SepttZF.m
+
+Smith_OptimScript.m
+
+SmithRed1_OptimScript.m
+
+SmithRed2_OptimScript.m
+
+SmithRed3_OptimScript.m

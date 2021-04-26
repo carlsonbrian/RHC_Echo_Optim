@@ -29,7 +29,7 @@
 #   NumBeats_SS                 % Number of beats to steady state
 #   NumBeats_ResPlot            % Num beats to calc residual/plot
 
-1	39  	56  	20   	50
+1	27  	56  	20   	50
 1	60.2	0   	38   	5 
 0	154 	53  	55   	  
  	1   	21  	3.59 	  
