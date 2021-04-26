@@ -1,0 +1,41 @@
+# COLUMN1 contains flags to tailor what is to be done in the code. It contains:
+#   RHCEcho_Flag                % RHC + Echo = 1, RHC only = 2
+#   OptimBest_Flag              % 1 = Optim p Run 0 = Opt or Other
+#   NomParam_Flag               % Sim/plot nominal params = 1, not = 0
+# COLUMN 2 contains the general patient info. It contains:
+#   DID_Num                     % Deidentified subject number 
+#   BW                          % Body weight (kg)
+#   Hgt                         % Height (cm)
+#   Sex                         % Sex (1 = M or 2 = F)
+# COLUMN 3 contains all the RHC measures. It contains:
+#   P_RVsyst                    % Systolic RV pressure (mmHg)     *
+#   P_RVdiast                   % Diastolic RV pressure (mmHg)    *
+#   P_PAsyst                    % Systolic pulm art press (mmHg)  *
+#   P_PAdiast                   % Diast pulm art press (mmHg)     *
+#   P_PCWave                    % Average pulm wedge press (mmHg) * 
+#   P_AOsyst                    % Systolic aortic press (mmHg)    *
+#   P_AOdiast                   % Diastolic aortic press (mmHg)   *
+#   HR_RHC                      % Average heart rate (beats/min)
+#   CO_Fick                     % Cardiac output Fick (L/min)     *
+#   CO_Thermo                   % Cardiac outpt thermodil (L/min) *
+# COLUMN 4 contains all the Echo measures. It contains:
+#   ID_LVsyst                   % LV inner diameter in systole
+#   ID_LVdiast                  % LV inner diameter in diastole
+#   HR_Echo                     % Average heart rate (beats/min)
+#   CO_EchoD                    % Cardiac output Echo-Dop (L/min) *
+#   V_LVsyst                    % Systolic LV volume (mL)         *
+#   V_LVdiast                   % Diastolic LV volume (mL)        *
+# COLUMN 5 contains all the simulation details. It contains:
+#   NumBeats_SS                 % Number of beats to steady state
+#   NumBeats_ResPlot            % Num beats to calc residual/plot
+
+1	39  	56  	20   	50
+1	60.2	0   	38   	5 
+0	154 	53  	55   	  
+ 	1   	21  	3.59 	  
+ 	    	13  	19.86	  
+ 	    	105 	70.89	  
+ 	    	55  	     	  
+ 	    	52.5	     	  
+ 	    	3.05	     	  
+ 	    	2.9 	     	  

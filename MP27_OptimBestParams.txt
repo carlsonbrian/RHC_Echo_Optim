@@ -1,0 +1,40 @@
+# The parameter values contained here are the optimized parameters
+# for the reduced version of the Smith model (Red4). They are given
+# in one column and are organized as:
+# A          --> Elastance driver function param (uls)
+# E_es_lvf   --> Left ventricular free wall elastance (mmHg/mL) 
+# P_0_lvf    --> Left ventricular end diastole pressure param (mmHg)
+# lambda_lvf --> Left ventricular end diastole pressure param (1/mL)
+# E_es_rvf   --> Right ventricular free wall elastance (mmHg/mL) 
+# P_0_rvf    --> Right ventricular end diastole pressure param (mmHg)
+# lambda_rvf --> Right ventricular end diastole pressure param (1/mL)
+# E_es_pa    --> Pulmonary arterial elastance (mmHg/mL)
+# E_es_pu    --> Pulmonary venous elastance (mmHg/mL)
+# R_pul      --> Pulmonary vasc resistance (mmHg*s/mL)
+# E_es_sa    --> Systemic arterial elastance (mmHg/mL)
+# E_es_sv    --> Systemic venous elastance (mmHg/mL)
+# R_sys      --> Systemic art resistance (mmHg*s/mL)
+# R_mt       --> Mitral valve resistance (mmHg*s/mL)
+# R_av       --> Aortic valve resistance (mmHg*s/mL)
+# R_tc       --> Tricuspid valve resistance (mmHg*s/mL)
+# R_pv       --> Pulmonary valve resistance (mmHg*s/mL)
+# SVFact     --> Stressed blood volume factor (uls)
+
+1
+5.598065
+0.120300
+0.064979
+2.214625
+0.215700
+0.005105
+0.773045
+0.014515
+0.453931
+1.148602
+0.014739
+1.665313
+0.005621
+0.054310
+0.000647
+0.012414
+1
