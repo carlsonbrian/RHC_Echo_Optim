@@ -41,15 +41,15 @@
 %   calculated - the pressure scaling terms, P_0lvf and P_0rvf. These are set to
 %   the values used in the original Smith et al. model.
 %
-%   Model originally created on     26  June 2020
-%   Model last modfied on            8 March 2021
+%   Model originally created on     26      June 2020
+%   Model last modfied on           21 September 2021
 %
 %   Developed by        Brian Carlson
 %                       Physiological Systems Dynamics Laboratory
 %                       Department of Molecular and Integrative Physiology
 %                       University of Michigan
 %
-%% ***********************************************************************************
+%% **********************************************************************************
 %  START OF        N O M I N A L   B L O O D   V O L U M E   C A L C U L A T O R    
 % ***********************************************************************************
 
@@ -65,8 +65,8 @@
     % Unpack parameters fixed for the purpose of nominal 
     %  parameter calculations based on normal cardiovascular 
     %  values or set to reflect heart failure conditions
-    P_0_lvf = CVParam_Struct.P_0_lvf;
-    P_0_rvf = CVParam_Struct.P_0_rvf;
+    P_0lv = CVParam_Struct.P_0lv;
+    P_0rv = CVParam_Struct.P_0rv;
     SVFact = CVParam_Struct.SVFact;
     % Unpack patient measures
     P_RVsyst = RHCData_Struct.P_RVsyst;
@@ -74,8 +74,8 @@
     P_PAsyst = RHCData_Struct.P_PAsyst;
     P_PAdiast = RHCData_Struct.P_PAdiast;
     P_PCWave = RHCData_Struct.P_PCWave;
-    P_AOsyst = RHCData_Struct.P_AOsyst;
-    P_AOdiast = RHCData_Struct.P_AOdiast;
+    P_SAsyst = RHCData_Struct.P_SAsyst;
+    P_SAdiast = RHCData_Struct.P_SAdiast;
     CO_Fick = RHCData_Struct.CO_Fick;
     CO_Thermo = RHCData_Struct.CO_Thermo;
     V_LVsyst = EchoData_Struct.V_LVsyst;
@@ -107,7 +107,7 @@
     VsB_sa = 160;           VuB_sa = 425;           VtB_sa = 585;
     VsB_sv = 219;           VuB_sv = 2697;          VtB_sv = 2916;
     VsB_pa = 69;            VuB_pa = 50;            VtB_pa = 119;
-    VsB_pu = 54;            VuB_pu = 460;           VtB_pu = 514;
+    VsB_pv = 54;            VuB_pv = 460;           VtB_pv = 514;
     VsB_lv = 125;           VuB_lv = 0;             VtB_lv = 125;
     VsB_la = 50;            VuB_la = 30;            VtB_la = 80;
     VsB_rv = 125;           VuB_rv = 0;             VtB_rv = 125;
@@ -151,7 +151,7 @@
     VsBRec_sa = VsRec_tot * (VuB_sa / VuB_tot);
     VsBRec_sv = VsRec_tot * (VuB_sv / VuB_tot);
     VsBRec_pa = VsRec_tot * (VuB_pa / VuB_tot);
-    VsBRec_pu = VsRec_tot * (VuB_pu / VuB_tot);
+    VsBRec_pv = VsRec_tot * (VuB_pv / VuB_tot);
     
     % So adding these recruited volumes to the Beneken Table 1-1 values
     %  assumed at 18.75% stressed blood volume will give the volumes in
@@ -159,7 +159,7 @@
     VsBNew_sa = VsB_sa + VsBRec_sa;
     VsBNew_sv = VsB_sv + VsBRec_sv;
     VsBNew_pa = VsB_pa + VsBRec_pa;
-    VsBNew_pu = VsB_pu + VsBRec_pu;
+    VsBNew_pv = VsB_pv + VsBRec_pv;
     
     % Dividing these new volumes by the total compartment volumes from 
     %  Benenken Table 1-1 gives the fraction of the total compartment
@@ -167,7 +167,7 @@
     VsBFrac_sa = VsBNew_sa / VtB_sa;
     VsBFrac_sv = VsBNew_sv / VtB_sv;
     VsBFrac_pa = VsBNew_pa / VtB_pa;
-    VsBFrac_pu = VsBNew_pu / VtB_pu;
+    VsBFrac_pv = VsBNew_pv / VtB_pv;
     
 
     %% NOW TRANSLATED THE RECALCULATED STRESSED VOLUME FRACTIONS TO PATIENT
@@ -187,83 +187,82 @@
     Vsa_tot = StrBV * (VtB_sa / VtB_tot);
     Vsv_tot = StrBV * (VtB_sv / VtB_tot);
     Vpa_tot = StrBV * (VtB_pa / VtB_tot);
-    Vpu_tot = StrBV * (VtB_pu / VtB_tot);
+    Vpu_tot = StrBV * (VtB_pv / VtB_tot);
     
     % Now calculate the stressed volumes using the 
     %  newly calculated fractions from the previous section
     Vs_sa = VsBFrac_sa * Vsa_tot;
     Vs_sv = VsBFrac_sv * Vsv_tot;
     Vs_pa = VsBFrac_pa * Vpa_tot;
-    Vs_pu = VsBFrac_pu * Vpu_tot;
+    Vs_pv = VsBFrac_pv * Vpu_tot;
     
     % Returning these values using the variable names used in the main script
     V_SAsyst = Vs_sa;
     V_SVsyst = Vs_sv;
     V_PAsyst = Vs_pa;
-    V_PUsyst = Vs_pu;
+    V_PVsyst = Vs_pv;
     
     
     %% CALCULATING THE NOMINAL PARAMETERS
-    % LEFT VENTRICLE FREE WALL PARAMETERS
-    % Calculate nominal E_es_lvf
-    PLVsyst_Nom = 1.025 * P_AOsyst;
-    Eeslvf_Nom = PLVsyst_Nom / V_LVsyst;                % Calculated from data
-    % Set P_0_lvf to normal Smith value
-    P0lvf_Nom = P_0_lvf;                                % Normal value
-    % Calculate nominal lambda_lvf
-    PPUpp_Nom = 0.20 * (P_PAsyst - P_PAdiast);          % Nom pulm venous pulse P
-    PPUdiast_Nom = P_PCWave - (PPUpp_Nom / 3);          % Nom pulm venous diast P
-    PLVdiast_Nom = 0.975 * PPUdiast_Nom;
-    lambdalvf_Nom = (log(PLVdiast_Nom) - ...
-        log(P0lvf_Nom)) / V_LVdiast;
+    % LEFT VENTRICLE PARAMETERS
+    % Calculate nominal E_lv
+    PLVsyst_Nom = 1.025 * P_SAsyst;
+    Elv_Nom = PLVsyst_Nom / V_LVsyst;                   % Calculated from data
+    % Set P_0lv to normal Smith value
+    P0lv_Nom = P_0lv;                                   % Normal value
+    % Calculate nominal lambda_lv
+    PPVpp_Nom = 0.20 * (P_PAsyst - P_PAdiast);          % Nom pulm venous pulse P
+    PPVdiast_Nom = P_PCWave - (PPVpp_Nom / 3);          % Nom pulm venous diast P
+    PLVdiast_Nom = 0.975 * PPVdiast_Nom;
+    lambdalv_Nom = (log(PLVdiast_Nom) - ...
+        log(P0lv_Nom)) / V_LVdiast;
     
-    % RIGHT VENTRICULAR FREE WALL PARAMETERS
-    % Calculate nominal E_es_rvf
+    % RIGHT VENTRICULAR PARAMETERS
+    % Calculate nominal E_rv
     VRVsyst_Nom = 0.90 * V_LVsyst;                      % Used in Heart Tx paper
-    Eesrvf_Nom = P_RVsyst / VRVsyst_Nom;                % Calculated from data
-    % Set P_0_rvf to normal Smith value
-    P0rvf_Nom = P_0_rvf;                                % Normal value
-    % Calculate nominal lambda_rvf
+    Erv_Nom = P_RVsyst / VRVsyst_Nom;                   % Calculated from data
+    % Set P_0rv to normal Smith value
+    P0rv_Nom = P_0rv;                                   % Normal value
+    % Calculate nominal lambda_rv
     VRVdiast_Nom = 0.90 * V_LVdiast;                    % Used in Heart Tx paper
-    PSVpp_Nom = 0.05 * (P_AOsyst - P_AOdiast);
-    % Calculating the nominal value of lambda_rvf 
+    PSVpp_Nom = 0.05 * (P_SAsyst - P_SAdiast);
     if (P_RVdiast <= 0)                                 % This takes care of when
         PRVdiast_Nom = PSVpp_Nom/2;                     %  P_RVdiast is zero (or
-        lambdarvf_Nom = (log(PRVdiast_Nom) - ...        %  negative) in the
-            log(P0rvf_Nom)) / VRVdiast_Nom;             %  clinical data
+        lambdarv_Nom = (log(PRVdiast_Nom) - ...         %  negative) in the
+            log(P0rv_Nom)) / VRVdiast_Nom;              %  clinical data
     else
-        lambdarvf_Nom = (log(P_RVdiast) - ...
-            log(P0rvf_Nom)) / VRVdiast_Nom;  
+        lambdarv_Nom = (log(P_RVdiast) - ...
+            log(P0rv_Nom)) / VRVdiast_Nom;  
     end
     
     % Pulmonary artery and vein parameters
-    Eespa_Nom = (P_PAsyst - P_PAdiast) / V_PAsyst;      % Nom pulm art elstnce
-    Eespu_Nom = PPUpp_Nom / V_PUsyst;                   % Nom pulm venous elstnce
-    % The factor in the second nominal value of P_PUsyst is based on the 
-    %  average P_PUsyst/P_PAsyst for all patients in HFpEF/HFrEF study where 
+    Epa_Nom = (P_PAsyst - P_PAdiast) / V_PAsyst;        % Nom pulm art elstnce
+    Epv_Nom = PPVpp_Nom / V_PVsyst;                     % Nom pulm venous elstnce
+    % The factor in the second nominal value of P_PVsyst is based on the 
+    %  average P_PVsyst/P_PAsyst for all patients in HFpEF/HFrEF study where 
     %  P_PCWave is less than P_PAsyst. Patient BCHF14 has P_PCWave = 78 mmHg and 
     %  P_PAsyst = 65 mmHg so this catches this type of mismeasurement. In this case
     %  the P_PUsyst from P_PAsyst based on the average of the other 30 patients in
-    %  this study. The factor (0.4854) representing this ratio of P_PUsyst/P_PAsyst 
+    %  this study. The factor (0.4854) representing this ratio of P_PVsyst/P_PAsyst 
     %  might be adjusted as our patient pool grows.
     P_PAave = (P_PAsyst/3) + ((2*P_PAdiast)/3);
-    PPUsyst_Nom1 = P_PCWave + ((2*PPUpp_Nom)/3);        % Nom pulm venous systolic P
-    PPUsyst_Nom2 = 0.4854 * P_PAsyst;                   % If P_PCWave is too big
-    if ((0.975 * P_PAave) >= PPUsyst_Nom1)
-        Rpul_Nom = ((P_PAave - PPUsyst_Nom1) / ...      % Nom pulm vasc resist
+    PPVsyst_Nom1 = P_PCWave + ((2*PPVpp_Nom)/3);        % Nom pulm venous systolic P
+    PPVsyst_Nom2 = 0.4854 * P_PAsyst;                   % If P_PCWave is too big
+    if ((0.975 * P_PAave) >= PPVsyst_Nom1)
+        Rpul_Nom = ((P_PAave - PPVsyst_Nom1) / ...      % Nom pulm vasc resist
             CO_RHC) * (60/1000);                        %  with conv to mmHg*s/mL
-    elseif (0.975 * P_PAsyst >= PPUsyst_Nom1)
-        Rpul_Nom = ((P_PAsyst - PPUsyst_Nom1) / ...     % Nom pulm vasc resist
+    elseif (0.975 * P_PAsyst >= PPVsyst_Nom1)
+        Rpul_Nom = ((P_PAsyst - PPVsyst_Nom1) / ...     % Nom pulm vasc resist
             CO_RHC) * (60/1000);                        %  with conv to mmHg*s/mL
     else
-        Rpul_Nom = ((P_PAsyst - PPUsyst_Nom2) / ...     % Nom pulm vasc resist
+        Rpul_Nom = ((P_PAsyst - PPVsyst_Nom2) / ...     % Nom pulm vasc resist
             CO_RHC) * (60/1000);                        %  with conv to mmHg*s/mL
     end
     
     % Systemic arteries and systemic veins parameters
-    Eessa_Nom = (P_AOsyst - P_AOdiast) / V_SAsyst;      % Nom systemic art elastance
-    Eessv_Nom = PSVpp_Nom / V_SVsyst;                   % Nom systemic ven elstnce
-    P_AOave = (P_AOsyst/3) + ((2*P_AOdiast)/3);
+    Esa_Nom = (P_SAsyst - P_SAdiast) / V_SAsyst;        % Nom systemic art elastance
+    Esv_Nom = PSVpp_Nom / V_SVsyst;                     % Nom systemic ven elastance
+    PSA_Ave = (P_SAsyst/3) + ((2*P_SAdiast)/3);
     if (P_RVdiast <= 0)                                 % Again if P_RVdiast is
         PSVdiast_Nom = 1.025 * PRVdiast_Nom;            %  negative in the data
         PSVsyst_Nom = PSVdiast_Nom + PSVpp_Nom;
@@ -272,21 +271,21 @@
         PSVsyst_Nom = PSVdiast_Nom + PSVpp_Nom;
     end
     
-    Rsys_Nom = ((P_AOave - PSVsyst_Nom) / ...           % Nom systemic vasc resist
+    Rsys_Nom = ((PSA_Ave - PSVsyst_Nom) / ...           % Nom systemic vasc resist
         CO_RHC) * (60/1000);                            %  with conv to mmHg*s/mL
     
-    % Heart valve paramenters
-    PPUdiast_Nom = P_PCWave - (PPUpp_Nom/3);            % Nom pulm venous dstlc P
-    PLVdiast_Nom = 0.975 * PPUdiast_Nom;
-    Rmt_Nom = ((PPUdiast_Nom - PLVdiast_Nom) / ...      % Nom mtrl vlv resist
+    % Heart valve parameters
+    PPVdiast_Nom = P_PCWave - (PPVpp_Nom/3);            % Nom pulm venous dstlc P
+    PLVdiast_Nom = 0.975 * PPVdiast_Nom;
+    Rmval_Nom = ((PPVdiast_Nom - PLVdiast_Nom) / ...    % Nom mtrl vlv resist
         CO_RHC) * (60/1000);                            %  with conv to mmHg*s/mL
-    Rav_Nom = ((PLVsyst_Nom - P_AOsyst) / ...           % Nom artc vlv resist
+    Raval_Nom = ((PLVsyst_Nom - P_SAsyst) / ...         % Nom artc vlv resist
         CO_RHC) * (60/1000);                            %  with conv to mmHg*s/mL
     if (P_RVdiast <= 0)                                 % Again if P_RVdiast is
-        Rtc_Nom = ((PSVdiast_Nom - PRVdiast_Nom) / ...  % Nom tricspd vlv resist
+        Rtval_Nom = ((PSVdiast_Nom - PRVdiast_Nom) / ...% Nom tricspd vlv resist
             CO_RHC) * (60/1000);                        %  with PRVdiast estimate
     else                                                %  and conv to mmHg*s/mL
-        Rtc_Nom = ((PSVdiast_Nom - P_RVdiast) / ...     % Nom tricspd vlv resist
+        Rtval_Nom = ((PSVdiast_Nom - P_RVdiast) / ...   % Nom tricspd vlv resist
             CO_RHC) * (60/1000);                        %  using PRVdiast from data
     end                                                 %  and conv to mmHg*s/mL
     if (P_PAsyst >= P_RVsyst)                           % In some cases Ppasyst
@@ -294,17 +293,17 @@
     else                                                %  which is not possible
         PPAsyst_Nom = P_PAsyst;                         %  so for calculation here
     end                                                 %  reset to 0.975 * Prvsyst
-    Rpv_Nom = (((P_RVsyst - PPAsyst_Nom) / ...          % Nom Pulm vlv resist w/conv
+    Rpval_Nom = (((P_RVsyst - PPAsyst_Nom) / ...        % Nom Pulm vlv resist w/conv
         CO_RHC) * (60/1000)) / 5;                       %  and fact based on opt vals
     
-    NomParam_Values = {Eeslvf_Nom P0lvf_Nom lambdalvf_Nom ...
-        Eesrvf_Nom P0rvf_Nom lambdarvf_Nom Eespa_Nom Eespu_Nom ...
-        Rpul_Nom Eessa_Nom Eessv_Nom Rsys_Nom Rmt_Nom Rav_Nom ...
-        Rtc_Nom Rpv_Nom};
-    NomParam_Fields = {'Eeslvf_Nom' 'P0lvf_Nom' 'lambdalvf_Nom' ...
-        'Eesrvf_Nom' 'P0rvf_Nom' 'lambdarvf_Nom' 'Eespa_Nom' 'Eespu_Nom' ...
-        'Rpul_Nom' 'Eessa_Nom' 'Eessv_Nom' 'Rsys_Nom' 'Rmt_Nom' 'Rav_Nom' ...
-        'Rtc_Nom' 'Rpv_Nom'};
+    NomParam_Values = {Elv_Nom P0lv_Nom lambdalv_Nom ...
+        Erv_Nom P0rv_Nom lambdarv_Nom Epa_Nom Epv_Nom ...
+        Rpul_Nom Esa_Nom Esv_Nom Rsys_Nom Rmval_Nom ...
+        Raval_Nom Rtval_Nom Rpval_Nom};
+    NomParam_Fields = {'Elv_Nom' 'P0lv_Nom' 'lambdalv_Nom' ...
+        'Erv_Nom' 'P0rv_Nom' 'lambdarv_Nom' 'Epa_Nom' 'Epv_Nom' ...
+        'Rpul_Nom' 'Esa_Nom' 'Esv_Nom' 'Rsys_Nom' 'Rmval_Nom' ...
+        'Raval_Nom' 'Rtval_Nom' 'Rpval_Nom'};
     NomParam_Struct = cell2struct(NomParam_Values,NomParam_Fields,2);
     
     

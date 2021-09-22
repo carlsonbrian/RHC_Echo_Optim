@@ -1,6 +1,6 @@
 % ***********************************************************************************
-%             S M I T H   C A R D I O V A S C U L A R   S Y S T E M S  
-%                 M O D E L   O B J E C T I V E   F U N C T I O N
+%             R E D U C E D   S M I T H   C A R D I O V A S C U L A R    
+%          S Y S T E M S   M O D E L   O B J E C T I V E   F U N C T I O N
 % ***********************************************************************************
 %
 %   This function caclulates the error between the RHC data and Echo data or 
@@ -8,27 +8,31 @@
 %   adjusted parameter values. This function is called by fmincon or ga in the 
 %   main script to optimize the set of adjustable parameters, p.
 %
-%   Model originally created on     14 November 2016
-%   Model last modfied on           16     July 2019
+%   Model originally created on     14  November 2016
+%   Model last modfied on           21 September 2021
 
 %   Developed by        Brian Carlson
 %                       Physiological Systems Dynamics Laboratory
 %                       Department of Molecular and Integrative Physiology
 %                       University of Michigan
 %
-% ***********************************************************************************
-%  Start of             S M I T H   C V   M O D E L   O B J   F U N C T I O N
+%% ***********************************************************************************
+%  Start of             R E D   S M I T H   C V   M O D E L   O B J   F U N C T N
 % ***********************************************************************************
 
 %% **********************************************************************************
-%  Optim Data for       S M I T H   C V   M O D E L   O B J   F U N C T I O N
+%  Optim Data for       R E D   S M I T H   C V   M O D E L   O B J   F U N C T N
 % ***********************************************************************************
 
 function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
 
     warning('off','all')
+    
+%% **********************************************************************************
+%  Optim Data for       R E D   S M I T H   C V   M O D E L   O B J   F U N C T N
+% ***********************************************************************************    
 
-%%  Unpack all the passed structures
+    % Unpack all the passed structures
     if (numel(fieldnames(AllStruct_Struct)) == 6)
         FlagData_Struct = AllStruct_Struct.FlagData_Struct;
         PatData_Struct = AllStruct_Struct.PatData_Struct;
@@ -44,8 +48,7 @@ function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
         SimOptParam_Struct = AllStruct_Struct.SimOptParam_Struct;
     end
         
-%%  Unpack the RHC and Echo data or RHC data alone
-    
+    % Unpack the RHC and Echo data or RHC data alone
     RHCEcho_Flag = FlagData_Struct.RHCEcho_Flag;
     if (RHCEcho_Flag == 1)
         % Unpack patient data
@@ -58,8 +61,8 @@ function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
         P_PAsyst_Data = RHCData_Struct.P_PAsyst;    % Syst pulm art press (mmHg)
         P_PAdiast_Data = RHCData_Struct.P_PAdiast;  % Diast pulm art press (mmHg)
         P_PCWave_Data = RHCData_Struct.P_PCWave;    % Ave pulm wedge press (mmHg)
-        P_AOsyst_Data = RHCData_Struct.P_AOsyst;    % Syst aortic press (mmHg)
-        P_AOdiast_Data = RHCData_Struct.P_AOdiast;  % Diast aortic press (mmHg)
+        P_SAsyst_Data = RHCData_Struct.P_SAsyst;    % Syst aortic press (mmHg)
+        P_SAdiast_Data = RHCData_Struct.P_SAdiast;  % Diast aortic press (mmHg)
         HR_RHC_Data = RHCData_Struct.HR_RHC;        % RHC heart rate (beats/min)
         CO_Fick_Data = RHCData_Struct.CO_Fick;      % Cardiac output Fick (L/min)
         CO_Thermo_Data = RHCData_Struct.CO_Thermo;  % Crd out thrmdil (L/min)
@@ -82,22 +85,19 @@ function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
         P_PAsyst_Data = RHCData_Struct.P_PAsyst;    % Syst pulm art press (mmHg)
         P_PAdiast_Data = RHCData_Struct.P_PAdiast;  % Diast pulm art press (mmHg)
         P_PCWave_Data = RHCData_Struct.P_PCWave;    % Ave pulm wedge press (mmHg)
-        P_AOsyst_Data = RHCData_Struct.P_AOsyst;    % Syst aortic press (mmHg)
-        P_AOdiast_Data = RHCData_Struct.P_AOdiast;  % Diast aortic press (mmHg)
+        P_SAsyst_Data = RHCData_Struct.P_SAsyst;    % Syst aortic press (mmHg)
+        P_SAdiast_Data = RHCData_Struct.P_SAdiast;  % Diast aortic press (mmHg)
         HR_RHC_Data = RHCData_Struct.HR_RHC;        % Ave heart rate (beats/min)
         CO_Fick_Data = RHCData_Struct.CO_Fick;      % Cardiac output Fick (L/min)
         CO_Thermo_Data = RHCData_Struct.CO_Thermo;  % Crd out thrmdil (L/min)
     end
     
-    
-%%  Unpack the simulation parameters 
+    % Unpack the simulation parameters 
     AdjParam_Strngs = SimOptParam_Struct.AdjParam_Strngs;
     NumBeats_SS = SimOptParam_Struct.NumBeats_SS;
     NumBeats_ResPlot = SimOptParam_Struct.NumBeats_ResPlot;
     
-    
-%%  Unpack the adjustable parameters and write into CVParam structure
-
+    % Unpack the adjustable parameters and write into CVParam structure
     Num_AdjParams = size(p,2);
     CVParam_FieldNames = fieldnames(CVParam_Struct);
     Num_AllParams = size(CVParam_FieldNames,1);
@@ -114,7 +114,9 @@ function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
     end
     
 
-%%  Calculate circulating blood volume for all simulations
+%% **********************************************************************************
+%  Initial Conds for    R E D   S M I T H   C V   M O D E L   O B J   F U N C T N
+% ***********************************************************************************
 
     SVFact = CVParam_Struct.SVFact;
     % Calculate total blood volume based on height, weight and sex.
@@ -128,7 +130,7 @@ function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
     %  pressure dynamics are not lumped into a general arterial systemic 
     %  compartment. Assuming they were simulating a typical 5000 mL total blood
     %  volume they included only 1500 mL (or 30%) in the circulating volume
-    %  therefore we will multiply our calculated TotBV value by 0.3 to yield 
+    %  therefore we will multiply our calculated TotBV valuIe by 0.3 to yield 
     %  circulating blood volume. To account for extra recruited volume in heart
     %  disease the 30% circulating blood volume can be altered by changing SVFact
     CircBV = SVFact * 0.30 * TotBV;
@@ -140,13 +142,16 @@ function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
     V_lv0 = (94.6812/1500) * CircBV;
     V_rv0 = (90.7302/1500) * CircBV;
     V_pa0 = (43.0123/1500) * CircBV;
-    V_pu0 = (808.458/1500) * CircBV;
-    V_ao0 = (133.338/1500) * CircBV;
-    V_vc0 = (329.780/1500) * CircBV;
+    V_pv0 = (808.458/1500) * CircBV;
+    V_sa0 = (133.338/1500) * CircBV;
+    V_sv0 = (329.780/1500) * CircBV;
     
     
-%%  Execute simulations for RHC only or RHC/Echo data
-
+%% **********************************************************************************
+%  Residual Calc for    R E D   S M I T H   C V   M O D E L   O B J   F U N C T N
+% ***********************************************************************************
+    
+    % Execute simulations for RHC only or RHC/Echo data
     if (RHCEcho_Flag == 1)                          % If 1 both RHC and Echo data
         
         % Use a try catch in case the parameter values cause a crash 
@@ -157,9 +162,9 @@ function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
             X0(1) = V_lv0;
             X0(2) = V_rv0;
             X0(3) = V_pa0;
-            X0(4) = V_pu0;
-            X0(5) = V_ao0;
-            X0(6) = V_vc0;
+            X0(4) = V_pv0;
+            X0(5) = V_sa0;
+            X0(6) = V_sv0;
         
             % FIRST PERFORM THE RHC SIMULATION
             % Build a structure with the RHC driver parameters
@@ -181,17 +186,17 @@ function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
             %  Now run Smith et al. model to get intermediate pressures
             Num_TOut_RHC = size(T_RHC_Out,1);    % Number of time points
             P_RV_RHC = zeros(Num_TOut_RHC,1);    % Preallocate matrices
-            P_AO_RHC = zeros(Num_TOut_RHC,1);
+            P_SA_RHC = zeros(Num_TOut_RHC,1);
             P_PA_RHC = zeros(Num_TOut_RHC,1);
-            P_PU_RHC = zeros(Num_TOut_RHC,1);
+            P_PV_RHC = zeros(Num_TOut_RHC,1);
             % Use output state variable vector to get pressures
             for i = 1:Num_TOut_RHC
                 VarOut = dXdT_SmithRed4(T_RHC_Out(i), ...
                     X_RHC_Out(i,:),DriverP_Struct,CVParam_Struct,1);
                 P_RV_RHC(i) = VarOut(2);
-                P_AO_RHC(i) = VarOut(3);
+                P_SA_RHC(i) = VarOut(3);
                 P_PA_RHC(i) = VarOut(5);
-                P_PU_RHC(i) = VarOut(6);
+                P_PV_RHC(i) = VarOut(6);
             end
             
             % NEXT PERFORM THE ECHO SIMULATION
@@ -225,8 +230,8 @@ function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
                 P_RVdiast_RHCSim = 200;
                 P_PAsyst_RHCSim = 0;
                 P_PAdiast_RHCSim = 150;
-                P_AOsyst_RHCSim = 0;
-                P_AOdiast_RHCSim = 250;
+                P_SAsyst_RHCSim = 0;
+                P_SAdiast_RHCSim = 250;
                 V_LVsyst_RHCSim = 150;
                 V_LVdiast_RHCSim = 0;
                 P_PCWave_RHCSum = 0;
@@ -244,9 +249,9 @@ function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
                     P_RVdiast_RHCSim = min(P_RVdiast_RHCSim,P_RV_RHC(i));
                     P_PAsyst_RHCSim = max(P_PAsyst_RHCSim,P_PA_RHC(i));
                     P_PAdiast_RHCSim = min(P_PAdiast_RHCSim,P_PA_RHC(i));
-                    P_AOsyst_RHCSim = max(P_AOsyst_RHCSim,P_AO_RHC(i));
-                    P_AOdiast_RHCSim = min(P_AOdiast_RHCSim,P_AO_RHC(i));
-                    P_PCWave_RHCSum = P_PCWave_RHCSum + P_PU_RHC(i);
+                    P_SAsyst_RHCSim = max(P_SAsyst_RHCSim,P_SA_RHC(i));
+                    P_SAdiast_RHCSim = min(P_SAdiast_RHCSim,P_SA_RHC(i));
+                    P_PCWave_RHCSum = P_PCWave_RHCSum + P_PV_RHC(i);
                     V_LVsyst_RHCSim = min(V_LVsyst_RHCSim,X_RHC_Out(i,1));
                     V_LVdiast_RHCSim = max(V_LVdiast_RHCSim,X_RHC_Out(i,1));
                 end
@@ -282,24 +287,22 @@ function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
                 %  Calculate the difference between data and simulation
                 % Right ventricle pressure normalized residual
                 P_RVsyst_Res = abs(P_RVsyst_RHCSim - ...
-                    P_RVsyst_Data) / P_AOsyst_Data;
+                    P_RVsyst_Data) / P_SAsyst_Data;
                 P_RVdiast_Res = abs(P_RVdiast_RHCSim - ...
-                    P_RVdiast_Data) / P_AOsyst_Data;
+                    P_RVdiast_Data) / P_SAsyst_Data;
                 % Pulmonary artery pressure normalized residual
                 P_PAsyst_Res = abs(P_PAsyst_RHCSim - ...
-                    P_PAsyst_Data) / P_AOsyst_Data;
+                    P_PAsyst_Data) / P_SAsyst_Data;
                 P_PAdiast_Res = abs(P_PAdiast_RHCSim - ...
-                    P_PAdiast_Data) / P_AOsyst_Data;
-                % Aortic pressure normalized residual
-                P_AOsyst_Res = abs(P_AOsyst_RHCSim - ...
-                    P_AOsyst_Data) / P_AOsyst_Data;
-                P_AOdiast_Res = abs(P_AOdiast_RHCSim - ...
-                    P_AOdiast_Data) / P_AOsyst_Data;
+                    P_PAdiast_Data) / P_SAsyst_Data;
+                % Systemic arterial pressure normalized residual
+                P_SAsyst_Res = abs(P_SAsyst_RHCSim - ...
+                    P_SAsyst_Data) / P_SAsyst_Data;
+                P_SAdiast_Res = abs(P_SAdiast_RHCSim - ...
+                    P_SAdiast_Data) / P_SAsyst_Data;
                 % Pulmonary wedge pressure (in pulmonary vein) normalized residual
-%                 P_PCWave_RHCSim
-%                 P_PCWave_Data
                 P_PCWave_Res = abs(P_PCWave_RHCSim - ...
-                    P_PCWave_Data) / P_AOsyst_Data;
+                    P_PCWave_Data) / P_SAsyst_Data;
                 % Cardiac output normalized residual for both simulations
                 % Find normalizing CO measure
                 if (V_LVsyst_Data == -1)
@@ -375,7 +378,7 @@ function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
                 % Now sum up all the residuals and average
                 Res = (P_RVsyst_Res + P_RVdiast_Res + ...
                     P_PAsyst_Res + P_PAdiast_Res + ...
-                    P_AOsyst_Res + P_AOdiast_Res + ...
+                    P_SAsyst_Res + P_SAdiast_Res + ...
                     P_PCWave_Res + CO_RHCRes + ...
                     CO_EchoRes + V_LVsyst_Res + ...
                     V_LVdiast_Res) / 11;
@@ -400,9 +403,9 @@ function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
             X0(1) = V_lv0;
             X0(2) = V_rv0;
             X0(3) = V_pa0;
-            X0(4) = V_pu0;
-            X0(5) = V_ao0;
-            X0(6) = V_vc0;
+            X0(4) = V_pv0;
+            X0(5) = V_sa0;
+            X0(6) = V_sv0;
         
             % PERFORM THE RHC SIMULATION
             % Build a structure with the RHC driver parameters
@@ -424,17 +427,17 @@ function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
             %  Now run Smith et al. model to get intermediate pressures
             Num_TOut_RHC = size(T_RHC_Out,1);    % Number of time points
             P_RV_RHC = zeros(Num_TOut_RHC,1); % Preallocate matrices
-            P_AO_RHC = zeros(Num_TOut_RHC,1);
+            P_SA_RHC = zeros(Num_TOut_RHC,1);
             P_PA_RHC = zeros(Num_TOut_RHC,1);
-            P_PU_RHC = zeros(Num_TOut_RHC,1);
+            P_PV_RHC = zeros(Num_TOut_RHC,1);
             % Use output state variable vector to get pressures
             for i = 1:Num_TOut_RHC
                 VarOut = dXdT_Smith(T_RHC_Out(i), ...
                     X_RHC_Out(i,:),DriverP_Struct,CVParam_Struct,1);
                 P_RV_RHC(i) = VarOut(2);
-                P_AO_RHC(i) = VarOut(3);
+                P_SA_RHC(i) = VarOut(3);
                 P_PA_RHC(i) = VarOut(5);
-                P_PU_RHC(i) = VarOut(6);
+                P_PV_RHC(i) = VarOut(6);
             end
             
             % NOW CHECK THAT THE ODES WERE INTEGRATED OVER THE FULL TIME SPAN
@@ -448,8 +451,8 @@ function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
                 P_RVdiast_RHCSim = 200;
                 P_PAsyst_RHCSim = 0;
                 P_PAdiast_RHCSim = 150;
-                P_AOsyst_RHCSim = 0;
-                P_AOdiast_RHCSim = 250;
+                P_SAsyst_RHCSim = 0;
+                P_SAdiast_RHCSim = 250;
                 V_LVsyst_RHCSim = 150;
                 V_LVdiast_RHCSim = 0;
                 P_PCWave_RHCSum = 0;
@@ -466,8 +469,8 @@ function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
                     P_RVdiast_RHCSim = min(P_RVdiast_RHCSim,P_RV_RHC(i));
                     P_PAsyst_RHCSim = max(P_PAsyst_RHCSim,P_PA_RHC(i));
                     P_PAdiast_RHCSim = min(P_PAdiast_RHCSim,P_PA_RHC(i));
-                    P_AOsyst_RHCSim = max(P_AOsyst_RHCSim,P_AO_RHC(i));
-                    P_AOdiast_RHCSim = min(P_AOdiast_RHCSim,P_AO_RHC(i));
+                    P_SAsyst_RHCSim = max(P_SAsyst_RHCSim,P_SA_RHC(i));
+                    P_SAdiast_RHCSim = min(P_SAdiast_RHCSim,P_SA_RHC(i));
                     P_PCWave_RHCSum = P_PCWave_RHCSum + P_PU_RHC(i);
                     V_LVsyst_RHCSim = min(V_LVsyst_RHCSim,X_RHC_Out(i,1));
                     V_LVdiast_RHCSim = max(V_LVdiast_RHCSim,X_RHC_Out(i,1));
@@ -479,21 +482,21 @@ function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
                 % NOW CALCULATING THE RESIDUAL FOR RHC DATA
                 %  Calculate the difference between data and simulation
                 % Right ventricle pressure normalized residual
-                P_RVsyst_Res = abs(P_RVsyst_RHCSim - P_RVsyst_Data) / P_AOsyst_Data;
-                P_RVdiast_Res = abs(P_RVdiast_RHCSim - P_RVdiast_Data) / P_AOsyst_Data;
+                P_RVsyst_Res = abs(P_RVsyst_RHCSim - P_RVsyst_Data) / P_SAsyst_Data;
+                P_RVdiast_Res = abs(P_RVdiast_RHCSim - P_RVdiast_Data) / P_SAsyst_Data;
                 % Pulmonary artery pressure normalized residual
-                P_PAsyst_Res = abs(P_PAsyst_RHCSim - P_PAsyst_Data) / P_AOsyst_Data;
-                P_PAdiast_Res = abs(P_PAdiast_RHCSim - P_PAdiast_Data) / P_AOsyst_Data;
-                % Aortic pressure normalized residual
-                P_AOsyst_Res = abs(P_AOsyst_RHCSim - P_AOsyst_Data) / P_AOsyst_Data;
-                P_AOdiast_Res = abs(P_AOdiast_RHCSim - P_AOdiast_Data) / P_AOsyst_Data;
+                P_PAsyst_Res = abs(P_PAsyst_RHCSim - P_PAsyst_Data) / P_SAsyst_Data;
+                P_PAdiast_Res = abs(P_PAdiast_RHCSim - P_PAdiast_Data) / P_SAsyst_Data;
+                % Systemic arterial pressure normalized residual
+                P_SAsyst_Res = abs(P_SAsyst_RHCSim - P_SAsyst_Data) / P_SAsyst_Data;
+                P_SAdiast_Res = abs(P_SAdiast_RHCSim - P_SAdiast_Data) / P_SAsyst_Data;
                 % Pulmonary wedge pressure (in pulmonary vein) normalized residual
-                P_PCWave_Res = abs(P_PCWave_RHCSim - P_PCWave_Data) / P_AOsyst_Data;
+                P_PCWave_Res = abs(P_PCWave_RHCSim - P_PCWave_Data) / P_SAsyst_Data;
                 % Cardiac output normalized residual
                 CO_Res = abs(CO_RHCSim - CO_Thermo_Data) / CO_Thermo_Data;
 
                 Res = (P_RVsyst_Res + P_RVdiast_Res + P_PAsyst_Res + ...
-                    P_PAdiast_Res + P_AOsyst_Res + P_AOdiast_Res + ...
+                    P_PAdiast_Res + P_SAsyst_Res + P_SAdiast_Res + ...
                     P_PCWave_Res + CO_Res) / 8;
             else
                 
