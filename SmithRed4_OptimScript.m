@@ -21,7 +21,7 @@
 %   been removed.
 %
 %   Script originally created on     17   January 2016
-%   Script last modfied on           21 September 2021
+%   Script last modfied on           22 September 2021
 %
 %   Developed by        Brian Carlson
 %                       Physiological Systems Dynamics Laboratory
@@ -40,12 +40,12 @@
     warning('off','all')
     
     % Change this to run different patients in the study
-    RunPtNum = 3;                                            % Patient number to run
+    RunPtNum = 110012;                                       % Patient number to run
     
     Delim_In = '\t';                                         % Delimiter in file
-    Num_HeadLns = 43;                                        % Number of header rows
+    Num_HeadLns = 45;                                        % Number of header rows
     FileName2Load = ...                                      % Construct input data
-    ['BCHF' num2str(RunPtNum) 'Red4_InputData.txt'];         %  filename
+    ['DG' num2str(RunPtNum) '_InputData.txt'];               %  filename
     DataStruct = ...                                         % Load data and header
         importdata(FileName2Load,Delim_In,Num_HeadLns);      %  into structure
     
@@ -62,7 +62,7 @@
     PatData_Vect = DataStruct.data(1:4,2);                  % General patient data
     RHCData_Vect = DataStruct.data(1:10,3);                 % RHC data
     if (FlagData_Vect(1) == 1)                              % RHC+Echo data present
-        EchoData_Vect = DataStruct.data(1:6,4);             % Echo data
+        EchoData_Vect = DataStruct.data(1:8,4);             % Echo data
         if (FlagData_Vect(2) == 1)
             SimOptSpecs_Vect = DataStruct.data(1:2,5);      % Hand tune sim beats
         else                                                %  and plot beats 
@@ -122,7 +122,7 @@
         % We are running patient data simulation or optimization so get the 
         % general data of study patient number, weight, height and sex
         DID_Num = ...                               % Deidentified subject number
-            ['BCHF' num2str(PatData_Vect(1))];                     
+            ['DG' num2str(PatData_Vect(1))];                     
         BW = PatData_Vect(2);                       % Body weight (kg)
         Hgt = PatData_Vect(3);                      % Height (cm)
         if (PatData_Vect(4) == 1)                   % Sex (M or F)
@@ -145,7 +145,11 @@
        	P_SAsyst = RHCData_Vect(6);                 % Systolic aortic press (mmHg)
        	P_SAdiast = RHCData_Vect(7);                % Diastolic aortic press (mmHg)
        	HR_RHC = RHCData_Vect(8);                   % Average heart rate (beats/min)
-       	CO_Fick = RHCData_Vect(9);                  % Cardiac output Fick (L/min)
+        if (isnan(RHCData_Vect(9)))
+            CO_Fick = -1;                           % No CO Fick in RHC record
+        else
+            CO_Fick = RHCData_Vect(9);              % Cardiac output Fick (L/min)
+        end
         if (isnan(RHCData_Vect(10)))
             CO_Thermo = -1;                         % No CO thermo in RHC record
         else
@@ -161,8 +165,13 @@
         
         % Get the echo data if present in the input file
         if (RHCEcho_Flag == 1)
-            ID_LVsyst = EchoData_Vect(1);           % Systolic LV inner diam (mm)
-            ID_LVdiast = EchoData_Vect(2);          % Diastolic LV inner diam (mm)
+            if (isnan(EchoData_Vect(1))) 
+                ID_LVsyst = -1;                     % No systolic LV inner diam
+                ID_LVdiast = -1;                    % No diastolic LV inner diam
+            else
+                ID_LVsyst = EchoData_Vect(1);       % Systolic LV inner diam (mm)
+                ID_LVdiast = EchoData_Vect(2);      % Diastolic LV inner diam (mm)
+            end
             HR_Echo	= EchoData_Vect(3);             % Average heart rate (beats/min)
             if (isnan(EchoData_Vect(4)))
                 CO_EchoD = -1;                      % No Echo-Dop cardiac output
@@ -170,17 +179,24 @@
                 CO_EchoD = EchoData_Vect(4);        % Cardiac output Echo-Dop (L/min)
             end
             if (isnan(EchoData_Vect(5)))            
-                V_LVsyst = -1;                      % 2D echo volumes
+                V_LVsyst = -1;                      % 2D echo or MRI volumes
                 V_LVdiast = -1;                     %  were not calculated
             else
                 V_LVsyst = EchoData_Vect(5);        % Systolic LV volume (mL)
                 V_LVdiast = EchoData_Vect(6);       % Diastolic LV volume (mL)
             end
+            if (isnan(EchoData_Vect(7)))            
+                V_RVsyst = -1;                      % MRI right side volumes
+                V_RVdiast = -1;                     %  were not calculated
+            else
+                V_RVsyst = EchoData_Vect(7);        % Systolic RV volume (mL)
+                V_RVdiast = EchoData_Vect(8);       % Diastolic RV volume (mL)
+            end
             % Save all Echo data into a structure to be passed to functions
             EchoData_Values = {ID_LVsyst ID_LVdiast HR_Echo ...
-                CO_EchoD V_LVsyst V_LVdiast};
+                CO_EchoD V_LVsyst V_LVdiast V_RVsyst V_RVdiast};
             EchoData_Fields = {'ID_LVsyst' 'ID_LVdiast' 'HR_Echo' ...
-                'CO_EchoD' 'V_LVsyst' 'V_LVdiast'};
+                'CO_EchoD' 'V_LVsyst' 'V_LVdiast' 'V_RVsyst' 'V_RVdiast'};
             EchoData_Struct = cell2struct(EchoData_Values, ...
                 EchoData_Fields,2);
         end
@@ -574,9 +590,9 @@
                 warning('off','all');
             end  
             ga_Opts = optimoptions('ga', ...
-                'PopulationSize',ga_PopSize, ...            % 250
+                'PopulationSize',ga_PopSize, ...         
                 'Display','iter', ...
-                'MaxStallGenerations',ga_MaxStallGens, ...  % 10
+                'MaxStallGenerations',ga_MaxStallGens, ...
                 'UseParallel',true);
             Num_AdjParams = size(p,2);
             % Set objective function handle and 

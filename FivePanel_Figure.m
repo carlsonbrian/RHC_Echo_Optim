@@ -59,6 +59,8 @@
             CO_EchoD = EchoData_Struct.CO_EchoD;        % Cardiac output Echo-Dop (L/min)
             V_LVsyst = EchoData_Struct.V_LVsyst;        % Systolic LV volume (mL)
             V_LVdiast = EchoData_Struct.V_LVdiast;      % Diastolic LV volume (mL)
+            V_RVsyst = EchoData_Struct.V_RVsyst;
+            V_RVdiast = EchoData_Struct.V_RVdiast;
             if (V_LVsyst == -1)
                 V_LVsyst_Teich = ...                    % Calculate the 
                     ((ID_LVsyst/10)^3) / ...            %  LV systolic volume
@@ -292,7 +294,7 @@
         'FontSize',20,'FontWeight','bold')
     
 
-    %% SUBPLOT OF V_LV and V_RV WITH V_LV DATA SHOWN
+    %% SUBPLOT OF V_LV and V_RV WITH DATA SHOWN
     subplot(2,3,2)
         if (RHCEcho_Flag == 1 && NormParam_Flag == 0)
             T_OutVols = T_OutEcho;
@@ -346,6 +348,14 @@
                 plot([T_OutVols(1) T_OutVols(end)], ...
                     [V_LVdiast_Teich V_LVdiast_Teich], ...
                     ':k','LineWidth',1.5)
+            end
+            if (V_RVsyst ~= -1)
+                plot([T_OutVols(1) T_OutVols(end)], ...
+                    [V_RVsyst V_RVsyst], ...
+                    '-.g','LineWidth',1.5)
+                plot([T_OutVols(1) T_OutVols(end)], ...
+                    [V_RVdiast V_RVdiast], ...
+                    ':g','LineWidth',1.5)
             end
         end
         xlim([0 5])                             % Formatting subplot
@@ -520,6 +530,14 @@
                 plot([V_LVdiast_Teich V_LVdiast_Teich], ...
                     [0.5*PMin_SP36 1.05*PMax_SP36], ...
                     ':k','LineWidth',1.5)
+            end
+            if (V_RVsyst ~= -1)
+                plot([V_RVsyst V_RVsyst], ...
+                    [0.5*PMin_SP36 1.05*PMax_SP36], ...
+                    '-.g','LineWidth',1.5)
+                plot([V_RVdiast V_RVdiast], ...
+                    [0.5*PMin_SP36 1.05*PMax_SP36], ...
+                    ':g','LineWidth',1.5)
             end
         end
         xlim([0 VMax_SP36*1.20])                % Formatting subplot
