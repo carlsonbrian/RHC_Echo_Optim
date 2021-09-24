@@ -11,7 +11,7 @@
 %   been removed.
 %
 %   Model originally created on     20 September 2018
-%   Model last modfied on           21 September 2021
+%   Model last modfied on           23 September 2021
 %
 %   Reproduced by       Brian Carlson
 %                       Physiological Systems Dynamics Laboratory
@@ -75,24 +75,24 @@
     % Pulmonary venous pressure development 
     %  and flow through mitral valve
     P_pv = E_pv * V_pv;
-    Q_mval = (P_pv - P_lv) / R_mval;
+    if (P_pv >= P_lv)
+        Q_mval = (P_pv - P_lv) / R_mval;
+    else
+        Q_mval = 0;
+    end
     
     % Systemic arterial pressure development 
     %  and flow through aortic valve
     P_sa = E_sa * V_sa;
-    Q_aval = (P_lv - P_sa) / R_aval;
+    if (P_lv >= P_sa)
+        Q_aval = (P_lv - P_sa) / R_aval;
+    else
+        Q_aval = 0;
+    end
     
     % Change in left ventricular volume based on 
     %  mitral and aortic valve flow
-    if ((Q_mval <= 0) && (Q_aval <= 0)) 
-        dVlvdt = 0; 
-    elseif (Q_mval <= 0) 
-        dVlvdt = (-1) * Q_aval;
-    elseif (Q_aval <= 0) 
-        dVlvdt = Q_mval; 
-    else
-        dVlvdt = Q_mval - Q_aval;
-    end
+    dVlvdt = Q_mval - Q_aval;
     
     % Right ventricular end systole and end diastole PVRs
 	P_es_rv = E_rv * V_rv;
@@ -104,52 +104,36 @@
     % Systemic venous pressure development 
     %  and flow through tricuspid valve
     P_sv = E_sv * V_sv;
-    Q_tval = (P_sv - P_rv) / R_tval;
+    if (P_sv >= P_rv)
+        Q_tval = (P_sv - P_rv) / R_tval;
+    else
+        Q_tval = 0;
+    end
     
     % Pulmonary arterial pressure development 
     %  and flow through pulmonary valve
     P_pa = E_pa * V_pa;
-    Q_pval = (P_rv - P_pa) / R_pval;
+    if (P_rv >= P_pa)
+        Q_pval = (P_rv - P_pa) / R_pval;
+    else
+        Q_pval = 0;
+    end
     
     % Change in right ventricular volume based on 
     %  tricuspid and pulmonary valve flow
-    if ((Q_tval <= 0) && (Q_pval <= 0)) 
-        dVrvdt = 0; 
-    elseif (Q_tval <= 0) 
-        dVrvdt = (-1) * Q_pval;
-    elseif (Q_pval <= 0) 
-        dVrvdt = Q_tval; 
-    else
-        dVrvdt = Q_tval - Q_pval;
-    end
+    dVrvdt = Q_tval - Q_pval;
 
 	% Change in pulmonary vasculature volume based on
     %  pulmonary and mitral valve flow
 	Q_pul = (P_pa - P_pv) / R_pul;
-    if (Q_pval <= 0)
-        dVpadt = -1 * Q_pul;
-    else
-        dVpadt = Q_pval - Q_pul;
-    end
-    if (Q_mval <= 0)
-        dVpvdt = Q_pul;
-    else
-        dVpvdt = Q_pul - Q_mval;
-    end
+    dVpadt = Q_pval - Q_pul;
+    dVpvdt = Q_pul - Q_mval;
     
 	% Change in systemic vasculature volume based on
-    %  aortic and tricuspid valve flow
+    %  systemic arterial and tricuspid valve flow
     Q_sys = (P_sa - P_sv) / R_sys;
-    if (Q_aval <= 0)
-        dVsadt = -1 * Q_sys;
-    else
-        dVsadt = Q_aval - Q_sys;
-    end
-    if (Q_tval <= 0)
-        dVsvdt = Q_sys;
-    else
-        dVsvdt = Q_sys - Q_tval;
-    end    
+    dVsadt = Q_aval - Q_sys;
+    dVsvdt = Q_sys - Q_tval;
     
     % Returns either the derivatives during integration or the
     %  intermediate pressures during post integration runs

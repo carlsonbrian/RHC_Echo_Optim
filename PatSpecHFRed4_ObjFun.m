@@ -185,7 +185,7 @@ function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
                 ode15s(@dXdT_SmithRed4,TSpan_SS,X0, ...
                 [],DriverP_Struct,CVParam_Struct);
            
-            %  Now run Smith et al. model to get intermediate pressures
+            %  Now run model to get intermediate pressures
             Num_TOut_RHC = size(T_RHC_Out,1);    % Number of time points
             P_RV_RHC = zeros(Num_TOut_RHC,1);    % Preallocate matrices
             P_SA_RHC = zeros(Num_TOut_RHC,1);
@@ -220,14 +220,74 @@ function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
                 ode15s(@dXdT_SmithRed4,TSpan_SS,X0, ...
                 [],DriverP_Struct,CVParam_Struct);
             
-            % NOW CHECK THAT THE ODES WERE INTEGRATED OVER THE FULL TIME SPAN
+            % CHECK THAT THE ODES WERE INTEGRATED OVER THE FULL TIME SPAN,
+            %  THE RV DIASTOLIC VOLUME IS NOT MORE THAN 1 1/2 TIMES LV
+            %  DISTOLIC VOLUME, AND THE TRICUSPID AND PULMONARY VALVES
+            %  ARE NOT OPEN CONCURRENTLY
+            % Full time integration check
             T_SSRHC = NumBeats_SS * (60/HR_RHC_Data);
             T_SSEchoMRI = NumBeats_SS * (60/HR_EchoMRI_Data);
-            if ((T_RHC_Out(end) == T_SSRHC) && ...
-                    (T_EchoMRI_Out(end) == T_SSEchoMRI))
+            FullTimeInt_Bln = (T_RHC_Out(end) == T_SSRHC) && ...
+                    (T_EchoMRI_Out(end) == T_SSEchoMRI);
+            % Get the needed simulation values to perform the checks    
+            if (FullTimeInt_Bln)
+                % Specifying the number of beats at the end of the Echo/MRI
+                %  simulation that we want to calculate the residual from and 
+                %  then the portion of the simulation to extract values from
+                TimeStart_EchoMRIResCalc = ...
+                    (NumBeats_SS - NumBeats_ResPlot) * ...
+                    period_EchoMRI;
+                tIndStart_EchoMRIResCalc = ...
+                    find((T_EchoMRI_Out >= ...
+                    TimeStart_EchoMRIResCalc),1,'first');
+                % Number of time points
+                Num_TOut_EchoMRI = size(T_EchoMRI_Out,1);  
+                % Get the diastolic LV and RV volumes
+                V_LVdiast_EchoMRISim = 0;
+                V_RVdiast_EchoMRISim = 0;
+                for i = tIndStart_EchoMRIResCalc:Num_TOut_EchoMRI
+                    V_LVdiast_EchoMRISim = ...
+                        max(V_LVdiast_EchoMRISim,X_EchoMRI_Out(i,1));
+                    V_RVdiast_EchoMRISim = ...
+                        max(V_RVdiast_EchoMRISim,X_EchoMRI_Out(i,2));
+                end
+                % CHECK THE DIASTOLIC RV/LV VOLUME RATIO 
+                RVVoLVV_Bln = ...
+                    (V_RVdiast_EchoMRISim <= ...
+                    1.5 * V_LVdiast_EchoMRISim);
+                
+                % Now run model to get intermediate Echo/MRI pressures 
+                %  to check for simultaneous valve opening
+                P_SV_EchoMRI = zeros(Num_TOut_EchoMRI,1);   % Preallocate matrices
+                P_RV_EchoMRI = zeros(Num_TOut_EchoMRI,1);    
+                P_PA_EchoMRI = zeros(Num_TOut_EchoMRI,1);
+                % Use output state variable vector to get pressures
+                for i = 1:Num_TOut_EchoMRI
+                    VarOut = dXdT_SmithRed4(T_EchoMRI_Out(i), ...
+                        X_EchoMRI_Out(i,:),DriverP_Struct,CVParam_Struct,1);
+                    P_SV_EchoMRI(i) = VarOut(4);
+                    P_RV_EchoMRI(i) = VarOut(2);
+                    P_PA_EchoMRI(i) = VarOut(5);
+                end
+                TValOpen_Inds = find((P_SV_EchoMRI - P_RV_EchoMRI) >= 0);
+                PValOpen_Inds = find((P_RV_EchoMRI - P_PA_EchoMRI) >= 0);
+                TPValOpen_Inds = intersect(TValOpen_Inds,PValOpen_Inds);
+                if (isempty(TPValOpen_Inds))
+                    TPValCheck_Bln = 1;
+                else
+                    TPValCheck_Bln = 0;
+                end
+                    
+            end
+                
+            % Diastolic RV volume <= Diastolic LV volume check
+            
+            % Tricuspid and pulmonary valve open same time check
+            
+            if (FullTimeInt_Bln && RVVoLVV_Bln && TPValCheck_Bln)
            
                 % GET SIMULATION VALUES TO COMPARE TO RHC DATA
-                % Assigning initial low vlaues on systolic and 
+                % Assigning initial low values on systolic and 
                 %  high values on diastolic pressures
                 P_RVsyst_RHCSim = 0;
                 P_RVdiast_RHCSim = 200;
@@ -267,32 +327,19 @@ function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
                 % GET SIMULATION VALUES TO COMPARE TO ECHO/MRI DATA
                 % Assigning initial low values on systolic and 
                 %  high values on diastolic pressures
-                Num_TOut_EchoMRI = size(T_EchoMRI_Out,1);  % Number of time points
                 V_LVsyst_EchoMRISim = 150;
-                V_LVdiast_EchoMRISim = 0;
                 V_RVsyst_EchoMRISim = 150;
-                V_RVdiast_EchoMRISim = 0;
-                % Specifying the number of beats at the end of the Echo/MRI
-                %  simulation that we want to calculate the residual from and 
-                %  then the portion of the simulation to extract values from
-                TimeStart_EchoMRIResCalc = ...
-                    (NumBeats_SS - NumBeats_ResPlot) * period_EchoMRI;
-                tIndStart_EchoMRIResCalc = ...
-                    find((T_EchoMRI_Out >= TimeStart_EchoMRIResCalc),1,'first');
-                % Looking for systolic and diastolic left and right ventricular
-                %  volume values in simulation results
+                % Looking for systolic left and right ventricular
+                %  volume values in simulation results (diastolics 
+                %  (already extracted above)
                 for i = tIndStart_EchoMRIResCalc:Num_TOut_EchoMRI
                     V_LVsyst_EchoMRISim = ...
                         min(V_LVsyst_EchoMRISim,X_EchoMRI_Out(i,1));
-                    V_LVdiast_EchoMRISim = ...
-                        max(V_LVdiast_EchoMRISim,X_EchoMRI_Out(i,1));
                     V_RVsyst_EchoMRISim = ...
                         min(V_RVsyst_EchoMRISim,X_EchoMRI_Out(i,2));
-                    V_RVdiast_EchoMRISim = ...
-                        max(V_RVdiast_EchoMRISim,X_EchoMRI_Out(i,2));
                 end
                 % Calculate Echo/MRI CO
-                CO_EchoSim = ((V_LVdiast_EchoMRISim - ...
+                CO_EchoMRISim = ((V_LVdiast_EchoMRISim - ...
                     V_LVsyst_EchoMRISim) * HR_EchoMRI_Data) / 1000;
             
                 % NOW CALCULATING THE RESIDUAL FOR BOTH RHC AND ECHO DATA
@@ -351,7 +398,7 @@ function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
                 % Next Echo cardiac output and volume residuals
                 if (V_LVsyst_Data == -1 && ...              % To calculate CO we
                     CO_EchoD_Data == -1)                    %  use 1D Echo and the
-                    CO_EchoRes = abs(CO_EchoSim - ...       %  Teichholz equation
+                    CO_EchoRes = abs(CO_EchoMRISim - ...    %  Teichholz equation
                         CO_EchoTeich) / CO_RHCEcho_Max;
                     V_LVsyst_Res = ...                      % No Echo 2D or MRI 
                         abs(V_LVsyst_EchoMRISim - ...       %  volumes so use
@@ -361,9 +408,10 @@ function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
                         V_LVdiast_Teich) / V_LVdiast_Teich;
                 elseif (V_LVsyst_Data == -1 && ...          % We have LVOT VTI CO
                         CO_EchoD_Data ~= -1)                %  so use this along 
-                    CO_EchoDRes = abs(CO_EchoSim - ...      %  with Teichholz volumes
+                    CO_EchoDRes = abs(CO_EchoMRISim - ...   %  with Teichholz volumes
                         CO_EchoSVHR) / CO_RHCEcho_Max;      %  volumes to get the 
-                    CO_EchoTeichRes = abs(CO_EchoSim - ...  %  CO residual
+                    CO_EchoTeichRes = ...                   %  CO residual
+                        abs(CO_EchoMRISim - ...  
                         CO_EchoTeich) / CO_RHCEcho_Max;
                     CO_EchoRes = (CO_EchoTeichRes + ...
                         CO_EchoDRes) / 2;
@@ -374,11 +422,12 @@ function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
                         abs(V_LVdiast_EchoMRISim - ...
                         V_LVdiast_Teich) / V_LVdiast_Teich;
                 else
-                    CO_EchoSVHRRes = abs(CO_EchoSim - ...   % We have 2D Echo or MRI
-                        CO_EchoSVHR) / CO_RHCEcho_Max;      %  volumes so we can
-                    CO_EchoDRes = abs(CO_EchoSim - ...      %  use these for the 
-                        CO_EchoD_Data) / CO_RHCEcho_Max;    %  calculation of the 
-                    CO_EchoRes = (CO_EchoSVHRRes + ...      %  CO residual
+                    CO_EchoSVHRRes = ...                    % We have 2D Echo or MRI
+                        abs(CO_EchoMRISim - ...             %  volumes so we can
+                        CO_EchoSVHR) / CO_RHCEcho_Max;      %  use these for the 
+                    CO_EchoDRes = abs(CO_EchoMRISim - ...   %  calculation of the 
+                        CO_EchoD_Data) / CO_RHCEcho_Max;    %  CO residual
+                    CO_EchoRes = (CO_EchoSVHRRes + ...      
                         CO_EchoDRes) / 2;
                     V_LVsyst_Res = ...                      % Use Echo or MRI volume
                         abs(V_LVsyst_EchoMRISim - ...       %  data for calculation 
