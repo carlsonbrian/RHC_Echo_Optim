@@ -1,0 +1,55 @@
+# COLUMN1 contains flags to tailor what is to be done in the code. It contains:
+#   RHCEcho_Flag                % RHC + Echo = 1, RHC only = 2
+#   HandTune_Flag               % 1 = Hnd tne or sim, 0 = Opt & sim
+#   Optim_Flag                  % 1 = fmincon, 2 = Genetic alg
+#   Parallel_Flag               % 1 = Parallel, 0 = Serial optim
+#   OptimBest_Flag              % 1 = Optim p Run 0 = Opt or Other
+#   SmithParam_Flag             % Run Smith params = 1, not = 0
+#   SaveSmith_Flag              % Save Smith run = 1, not = 0
+#   Comp2Smith_Flag             % Compare to Smith = 1, not = 0
+#   NomParam_Flag               % Sim/plot nominal params = 1, not = 0
+# COLUMN 2 contains the general patient info. It contains:
+#   DID_Num                     % Deidentified subject number 
+#   BW                          % Body weight (kg)
+#   Hgt                         % Height (cm)
+#   Sex                         % Sex (1 = M or 2 = F)
+# COLUMN 3 contains all the RHC measures. It contains:
+#   P_RVsyst                    % Systolic RV pressure (mmHg)     *
+#   P_RVdiast                   % Diastolic RV pressure (mmHg)    *
+#   P_PAsyst                    % Systolic pulm art press (mmHg)  *
+#   P_PAdiast                   % Diast pulm art press (mmHg)     *
+#   P_PCWave                    % Average pulm wedge press (mmHg) * 
+#   P_AOsyst                    % Systolic aortic press (mmHg)    *
+#   P_AOdiast                   % Diastolic aortic press (mmHg)   *
+#   HR_RHC                      % Average heart rate (beats/min)
+#   CO_Fick                     % Cardiac output Fick (L/min)     *
+#   CO_Thermo                   % Cardiac outpt thermodil (L/min) *
+# COLUMN 4 contains all the Echo measures. It contains:
+#   ID_LVsyst                   % LV inner diameter in systole
+#   ID_LVdiast                  % LV inner diameter in diastole
+#   HR_Echo                     % Average heart rate (beats/min)
+#   CO_EchoD                    % Cardiac output Echo-Dop (L/min) *
+#   V_LVsyst                    % Systolic LV volume (mL)         *
+#   V_LVdiast                   % Diastolic LV volume (mL)        *
+#   V_RVsyst                    % Systolic RV volume (mL)        *
+#   V_RVdiast                   % Diastolic RV volume (mL)        *
+# COLUMN 5 contains all the simulation details. It contains:
+#   NumBeats_SS                 % Number of beats to steady state
+#   NumBeats_ResPlot            % Num beats to calc residual/plot
+#   fmc_MaxFunEvals             % Num functional evals for fmincon
+#   fmc_MaxIter                 % Num max iterations for fmincon
+#   GA_PopSize                  % Population size for ga
+#   GA_MaxStallGens             % Stall generation limit for ga
+# COLUMN 6 contains a list of adjustable parameters with the
+#   parameter numbers specified in the body of the script
+
+1	110012	34   	      	50  	1
+0	62    	12   	      	5   	3
+2	165   	41   	56    	200 	4
+1	2     	15   	      	20  	6
+0	      	13   	61.32 	50  	7
+0	      	166  	139.76	5   	8
+0	      	59   	51.39 	    	9
+0	      	70   	124.21	    	10
+0	      	     	      	    	12
+ 	      	5.03 	      	    	  

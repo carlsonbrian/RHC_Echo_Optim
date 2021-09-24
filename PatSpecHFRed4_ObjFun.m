@@ -279,10 +279,6 @@ function Res = PatSpecHFRed4_ObjFun(p,AllStruct_Struct)
                 end
                     
             end
-                
-            % Diastolic RV volume <= Diastolic LV volume check
-            
-            % Tricuspid and pulmonary valve open same time check
             
             if (FullTimeInt_Bln && RVVoLVV_Bln && TPValCheck_Bln)
            
